@@ -13,6 +13,7 @@ import { FrameBus } from './stage/frameBus'
 import { StoryStage } from './stage/StoryStage'
 import type { Layout, Screen } from './stage/types'
 import { useStoryLoop } from './stage/useStoryLoop'
+import { CompactRendering, useCompactRendering } from './stage/renderingProfile'
 import './styles/app.css'
 
 // Інструменти розробника — тільки під час `npm run dev` (у production цей код вирізається).
@@ -38,10 +39,12 @@ export function App() {
   const state = useSyncExternalStore(engine.subscribe, engine.getSnapshot, engine.getSnapshot)
   const bus = useMemo(() => new FrameBus(), [])
   const reduced = useReducedMotion()
+  const compact = useCompactRendering()
   const [started, setStarted] = useState(false)
   const [lyricsOn, setLyricsOn] = useState(true)
   const [textOpen, setTextOpen] = useState(false)
-  const screen = useRef<Screen>(measureScreen())
+  const [initialScreen] = useState(measureScreen)
+  const screen = useRef<Screen>(initialScreen)
   const [layout, setLayout] = useState<Layout>(screen.current.layout)
   const [screenKey, setScreenKey] = useState('')
 
@@ -64,7 +67,7 @@ export function App() {
     }
   }, [])
 
-  useStoryLoop(engine, bus, screen, reduced, `${layout}|${screenKey}`)
+  useStoryLoop(engine, bus, screen, reduced, `${layout}|${screenKey}`, compact)
 
   const start = useCallback(() => {
     setStarted(true)
@@ -101,7 +104,8 @@ export function App() {
   }, [started, engine])
 
   return (
-    <div className={`app${started ? ' app--started' : ''}${reduced ? ' app--reduced' : ''}${ended ? ' app--ended' : ''}`}>
+    <CompactRendering.Provider value={compact}>
+    <div className={`app${started ? ' app--started' : ''}${reduced ? ' app--reduced' : ''}${compact ? ' app--compact' : ''}${ended ? ' app--ended' : ''}`}>
       <StoryStage scenes={SCENES} bus={bus} layout={layout} />
       <div className="vignette" aria-hidden="true" />
       <div className="bottom-fade" aria-hidden="true" />
@@ -123,5 +127,6 @@ export function App() {
         </Suspense>
       )}
     </div>
+    </CompactRendering.Provider>
   )
 }

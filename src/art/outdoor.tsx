@@ -32,10 +32,16 @@ export function FlowerBush({ x, y, s = 1, seed = 1, palette = 0, count = 9 }: { 
         <g key={i} transform={`translate(${hd.x.toFixed(1)} ${hd.y.toFixed(1)})`}>
           <circle r={hd.r} fill={hd.c[1]} />
           <circle r={hd.r * 0.78} fill={hd.c[0]} />
-          {Array.from({ length: 8 }, (_, j) => {
-            const a = (j / 8) * Math.PI * 2
-            return <line key={j} x1={Math.cos(a) * hd.r * 0.25} y1={Math.sin(a) * hd.r * 0.25} x2={Math.cos(a) * hd.r * 0.9} y2={Math.sin(a) * hd.r * 0.9} stroke={hd.c[1]} strokeWidth={1.2} opacity={0.6} />
-          })}
+          <path
+            d={Array.from({ length: 8 }, (_, j) => {
+              const a = (j / 8) * Math.PI * 2
+              return `M${Math.cos(a) * hd.r * 0.25} ${Math.sin(a) * hd.r * 0.25} L${Math.cos(a) * hd.r * 0.9} ${Math.sin(a) * hd.r * 0.9}`
+            }).join(' ')}
+            fill="none"
+            stroke={hd.c[1]}
+            strokeWidth={1.2}
+            opacity={0.6}
+          />
           <circle r={hd.r * 0.22} fill={hd.c[1]} />
         </g>
       ))}

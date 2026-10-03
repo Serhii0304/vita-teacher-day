@@ -50,6 +50,7 @@ function blinkAt(t: number, seed: number): number {
 export function Character({ body, look, outfit, light = 'front', seed = 1, shadow = 0.32, ref }: Props) {
   const uid = 'c' + useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const els = useRef<Record<string, SVGElement>>({})
+  const attributes = useRef(new WeakMap<SVGElement, Map<string, string>>())
   const cbs = useRef(new Map<string, RefCallback<SVGElement>>())
   const reg: Reg = (key) => {
     let cb = cbs.current.get(key)
@@ -77,12 +78,26 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
       const E = els.current
       const set = (k: string, attr: string, v: string) => {
         const e = E[k]
-        if (e) e.setAttribute(attr, v)
+        if (!e) return
+        let values = attributes.current.get(e)
+        if (!values) {
+          values = new Map()
+          attributes.current.set(e, values)
+        }
+        if (values.get(attr) === v) return
+        e.setAttribute(attr, v)
+        values.set(attr, v)
       }
+      const style = (k: string, prop: 'opacity' | 'display', v: string) => {
+        const e = E[k]
+        if (e && e.style[prop] !== v) e.style[prop] = v
+      }
+      const visible = clamp(p.vis)
+      style('root', 'opacity', String(visible))
+      // Після появи вся поза відразу обчислюється з поточного часу аудіо.
+      if (visible <= 0) return
       const flip = p.flip >= 0 ? 1 : -1
       set('root', 'transform', `translate(${r(p.x)} ${r(p.y)}) scale(${r(p.sc * flip * 1000) / 1000} ${r(p.sc * 1000) / 1000})`)
-      const root = E.root as SVGGElement | undefined
-      if (root) root.style.opacity = String(clamp(p.vis))
 
       // «живі» рухи — функції від часу, тому на паузі завмирають
       const breath = Math.sin((t * Math.PI * 2) / 4.1 + seed) * p.breath
@@ -178,10 +193,8 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
       set('mouthHi', 'd', m.hi)
       set('dimN', 'd', m.dimN)
       const smileAmt = Math.max(0, p.smile)
-      const dim = E.dimN as SVGPathElement | undefined
-      if (dim) dim.style.opacity = String(r(clamp((smileAmt - 0.35) * 0.9)))
-      const inner = E.mouthInnerG as SVGGElement | undefined
-      if (inner) inner.style.display = m.showInner ? '' : 'none'
+      style('dimN', 'opacity', String(r(clamp((smileAmt - 0.35) * 0.9))))
+      style('mouthInnerG', 'display', m.showInner ? '' : 'none')
       const n = noseShapes(g, st)
       set('noseBridge', 'd', n.bridge)
       set('noseNostril', 'd', n.nostril)
@@ -189,26 +202,25 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
       set('noseTip', 'd', n.tip)
       set('noseShade', 'd', n.shade)
       set('noseHl', 'transform', `translate(${r(n.hl.x)} ${r(n.hl.y)})`)
-      const bridgeEl = E.noseBridge as SVGPathElement | undefined
-      if (bridgeEl) bridgeEl.style.opacity = String(r(0.06 + fp.turn * 0.22))
+      style('noseBridge', 'opacity', String(r(0.06 + fp.turn * 0.22)))
       set('cheekN', 'transform', `translate(${r(g.cheekN.x)} ${r(g.cheekN.y - smileAmt * 0.9)})`)
       set('cheekF', 'transform', `translate(${r(g.cheekF.x)} ${r(g.cheekF.y - smileAmt * 0.9)}) scale(${r(0.5 + 0.5 * Math.cos(g.th + 0.75))} 1)`)
-      const cheeks = E.cheeks as SVGGElement | undefined
-      if (cheeks) cheeks.style.opacity = String(r(clamp(0.22 + smileAmt * 0.32 + p.blush * 0.5)))
+      style('cheeks', 'opacity', String(r(clamp(0.22 + smileAmt * 0.32 + p.blush * 0.5))))
       set('ear', 'transform', `translate(${r(g.ear.x)} ${r(g.ear.y)})`)
       if (!woman) {
-        const folds = E.folds as SVGPathElement | undefined
         set(
           'folds',
           'd',
           `M${r(g.nose.x - 5.4)} ${r(g.nose.y + 0.2)}Q${r(g.mN.x - 3.4)} ${r(g.mouth.y - 1.4)} ${r(g.mN.x - 2.2)} ${r(g.mouth.y + 2.4)}`,
         )
-        if (folds) folds.style.opacity = String(r(clamp(smileAmt * 0.5)))
+        style('folds', 'opacity', String(r(clamp(smileAmt * 0.5))))
       }
       set('chinShade', 'd', `M${r(g.mN.x - 3)} ${r(g.chin.y - 2.6)}Q${r(g.chin.x)} ${r(g.chin.y - 0.6)} ${r(g.mF.x + 2.6)} ${r(g.chin.y - 3)}`)
       set('jawShade', 'd', jawShadePath(g, st))
 
       // ---- руки ----
+      const ffront = p.fFront > 0.5
+      const farSide = ffront ? 'FF' : 'F'
       const arm = (side: 'N' | 'F', sh: [number, number], hx: number, hy: number, w: number, abs: number, hand: number, prop: number, fs: number) => {
         // перспективне скорочення: рука, спрямована до глядача (напр. телефон біля вуха), виглядає коротшою
         const k1 = 1 - 0.62 * clamp(fs)
@@ -219,7 +231,7 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
         const parentAbs = lean + ik.bAbs
         const wrist = lerp(w, w - parentAbs, clamp(abs))
         const chain = `${tc} translate(${sh[0]} ${r(sh[1] - breath * 0.5)})`
-        const targets = side === 'N' ? ['N'] : ['F', 'FF']
+        const targets = side === 'N' ? ['N'] : [farSide]
         for (const s of targets) {
           set(`arm${s}`, 'transform', `${chain} rotate(${r(ik.a)})`)
           set(`upper${s}`, 'transform', `scale(1 ${r(k1 * 1000) / 1000})`)
@@ -228,47 +240,39 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
           set(`hand${s}`, 'transform', `translate(0 ${r(L2)}) rotate(${r(wrist)})`)
           const hs = Math.round(hand)
           for (let i = 0; i <= 4; i++) {
-            const he = E[`h${s}${i}`] as SVGGElement | undefined
-            if (he) he.style.display = i === hs ? '' : 'none'
+            style(`h${s}${i}`, 'display', i === hs ? '' : 'none')
           }
           const pr = Math.round(prop)
           for (let i = 1; i <= 5; i++) {
-            const pe = E[`p${s}${i}`] as SVGGElement | undefined
-            if (pe) pe.style.display = i === pr ? '' : 'none'
+            style(`p${s}${i}`, 'display', i === pr ? '' : 'none')
           }
         }
       }
       arm('N', body.shN, p.nhx, p.nhy, p.nw, p.nA, p.nHand, p.propN, p.nFS ?? 0)
       arm('F', body.shF, p.fhx, p.fhy, p.fw, p.fA, p.fHand, p.propF, p.fFS ?? 0)
-      const ffront = p.fFront > 0.5
-      const fb = E.armFBack as SVGGElement | undefined
-      const ff = E.armFFront as SVGGElement | undefined
-      if (fb) fb.style.display = ffront ? 'none' : ''
-      if (ff) ff.style.display = ffront ? '' : 'none'
+      style('armFBack', 'display', ffront ? 'none' : '')
+      style('armFFront', 'display', ffront ? '' : 'none')
 
       // ---- предмети: книга, пара над чашкою, букет ----
-      for (const s of ['N', 'F', 'FF']) {
-        const cover = E[`${s}cover`] as SVGGElement | undefined
-        if (cover) {
+      for (const [s, prop] of [['N', Math.round(p.propN)], [farSide, Math.round(p.propF)]] as const) {
+        if (prop === 1) {
           const o = clamp(p.bookOpen)
           const sx = Math.cos(o * Math.PI)
-          cover.setAttribute('transform', `translate(1 0) scale(${r(sx * 1000) / 1000} 1) translate(-1 0)`)
-          const inside = E[`${s}coverIn`] as SVGGElement | undefined
-          if (inside) inside.style.opacity = sx < 0 ? '1' : '0'
+          set(`${s}cover`, 'transform', `translate(1 0) scale(${r(sx * 1000) / 1000} 1) translate(-1 0)`)
+          style(`${s}coverIn`, 'opacity', sx < 0 ? '1' : '0')
         }
-        const steam = E[`${s}steam`] as SVGGElement | undefined
-        if (steam) {
-          steam.style.opacity = String(r(clamp(p.steam)))
+        if (prop === 2) {
+          const steam = r(clamp(p.steam))
+          style(`${s}steam`, 'opacity', String(steam))
+          if (steam <= 0) continue
           const ph = t * 1.3 + seed
           set(`${s}steam1`, 'd', `M4 -18 c${r(-3 + Math.sin(ph) * 1.5)} -4 ${r(3 + Math.sin(ph + 1) * 1.5)} -7 ${r(Math.sin(ph * 0.8) * 1.2)} -11`)
           set(`${s}steam2`, 'd', `M9 -18 c${r(-3 + Math.sin(ph + 2) * 1.5)} -4 ${r(3 + Math.sin(ph + 3) * 1.5)} -7 ${r(Math.sin(ph * 0.7 + 1) * 1.2)} -11`)
         }
+        if (prop !== 4) continue
         for (let i = 1; i <= 6; i++) {
-          const f = E[`${s}bq${i}`] as SVGGElement | undefined
-          if (f) {
-            const b = clamp(p.bloom - (i % 3) * 0.08)
-            f.setAttribute('transform', `scale(${r(0.55 + 0.45 * b)}) rotate(${r((1 - b) * 25 * (i % 2 ? 1 : -1))})`)
-          }
+          const b = clamp(p.bloom - (i % 3) * 0.08)
+          set(`${s}bq${i}`, 'transform', `scale(${r(0.55 + 0.45 * b)}) rotate(${r((1 - b) * 25 * (i % 2 ? 1 : -1))})`)
         }
       }
     },

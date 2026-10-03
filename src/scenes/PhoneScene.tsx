@@ -11,6 +11,7 @@ import { clamp, ease, lerp, smoothstep, windowEnv } from '../engine/math'
 import type { Params } from '../engine/moves'
 import { Actor } from '../stage/actor'
 import { CamTrack, cameraViewBox, rc } from '../stage/camera'
+import { setSvgAttribute } from '../stage/svgAttributes'
 import type { Layout, RegisterScene, Screen } from '../stage/types'
 import { useTimeline } from '../stage/useTimeline'
 import type { Timeline } from '../story/timeline'
@@ -232,7 +233,7 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
       update={(ctx, svg) => {
         const t = ctx.t
         const scr = ctx.screen
-        svg.setAttribute('viewBox', `0 0 ${scr.w} ${scr.h}`)
+        setSvgAttribute(svg, 'viewBox', `0 0 ${scr.w} ${scr.h}`)
         const gap = p.gap(t)
         const [A, B] = panels(scr, gap)
         const open = p.open(ctx.tReal)
@@ -242,22 +243,22 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
           [panelB.current, clipB.current, B, 1],
         ] as const) {
           if (!el || !clip) continue
-          el.setAttribute('x', String(R.x))
-          el.setAttribute('y', String(R.y))
-          el.setAttribute('width', String(R.w))
-          el.setAttribute('height', String(R.h))
+          setSvgAttribute(el, 'x', String(R.x))
+          setSvgAttribute(el, 'y', String(R.y))
+          setSvgAttribute(el, 'width', String(R.w))
+          setSvgAttribute(el, 'height', String(R.h))
           if (scr.layout === 'wide') {
             const w = R.w * open
-            clip.setAttribute('x', String(side === 0 ? R.x + R.w - w : R.x))
-            clip.setAttribute('y', '0')
-            clip.setAttribute('width', String(w))
-            clip.setAttribute('height', String(scr.h))
+            setSvgAttribute(clip, 'x', String(side === 0 ? R.x + R.w - w : R.x))
+            setSvgAttribute(clip, 'y', '0')
+            setSvgAttribute(clip, 'width', String(w))
+            setSvgAttribute(clip, 'height', String(scr.h))
           } else {
             const h = R.h * open
-            clip.setAttribute('x', '0')
-            clip.setAttribute('y', String(side === 0 ? R.y + R.h - h : R.y))
-            clip.setAttribute('width', String(scr.w))
-            clip.setAttribute('height', String(h))
+            setSvgAttribute(clip, 'x', '0')
+            setSvgAttribute(clip, 'y', String(side === 0 ? R.y + R.h - h : R.y))
+            setSvgAttribute(clip, 'width', String(scr.w))
+            setSvgAttribute(clip, 'height', String(h))
           }
         }
         const subA: Screen = { ...scr, w: A.w, h: A.h, reservedBottom: scr.layout === 'wide' ? scr.reservedBottom : 0, reservedTop: scr.reservedTop }
@@ -267,8 +268,8 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
         if (mirrorB) fb = { ...fb, x: -fb.x - fb.w }
         const vbA = cameraViewBox(fa, subA)
         const vbB = cameraViewBox(fb, subB)
-        panelA.current?.setAttribute('viewBox', vbA.map((v) => v.toFixed(1)).join(' '))
-        panelB.current?.setAttribute('viewBox', vbB.map((v) => v.toFixed(1)).join(' '))
+        setSvgAttribute(panelA.current, 'viewBox', vbA.map((v) => v.toFixed(1)).join(' '))
+        setSvgAttribute(panelB.current, 'viewBox', vbB.map((v) => v.toFixed(1)).join(' '))
 
         const kin = p.kin(t)
         herRoom.current?.update({ lamp: 1, night: p.night(t), clock: p.clock(t), cup: true, notebooks: true, cards: 0.3 + kin * 0.5, vase: true, bloom: 1 })
@@ -284,25 +285,25 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
         const glow = 0.55 + 0.45 * kin + 0.15 * Math.sin(t * 1.3)
         if (divider.current) {
           if (scr.layout === 'wide') {
-            divider.current.setAttribute('x', String(A.w))
-            divider.current.setAttribute('y', '0')
-            divider.current.setAttribute('width', String(gap))
-            divider.current.setAttribute('height', String(scr.h))
+            setSvgAttribute(divider.current, 'x', String(A.w))
+            setSvgAttribute(divider.current, 'y', '0')
+            setSvgAttribute(divider.current, 'width', String(gap))
+            setSvgAttribute(divider.current, 'height', String(scr.h))
           } else {
-            divider.current.setAttribute('x', '0')
-            divider.current.setAttribute('y', String(A.h))
-            divider.current.setAttribute('width', String(scr.w))
-            divider.current.setAttribute('height', String(gap))
+            setSvgAttribute(divider.current, 'x', '0')
+            setSvgAttribute(divider.current, 'y', String(A.h))
+            setSvgAttribute(divider.current, 'width', String(scr.w))
+            setSvgAttribute(divider.current, 'height', String(gap))
           }
           divider.current.style.opacity = glow.toFixed(3)
         }
         if (dividerGlow.current) {
           const cx = scr.layout === 'wide' ? A.w + gap / 2 : scr.w / 2
           const cy = scr.layout === 'wide' ? scr.h * 0.42 : A.h + gap / 2
-          dividerGlow.current.setAttribute('cx', cx.toFixed(1))
-          dividerGlow.current.setAttribute('cy', cy.toFixed(1))
-          dividerGlow.current.setAttribute('rx', (scr.layout === 'wide' ? 60 + kin * 50 : scr.w * 0.6).toFixed(1))
-          dividerGlow.current.setAttribute('ry', (scr.layout === 'wide' ? scr.h * 0.5 : 40 + kin * 30).toFixed(1))
+          setSvgAttribute(dividerGlow.current, 'cx', cx.toFixed(1))
+          setSvgAttribute(dividerGlow.current, 'cy', cy.toFixed(1))
+          setSvgAttribute(dividerGlow.current, 'rx', (scr.layout === 'wide' ? 60 + kin * 50 : scr.w * 0.6).toFixed(1))
+          setSvgAttribute(dividerGlow.current, 'ry', (scr.layout === 'wide' ? scr.h * 0.5 : 40 + kin * 30).toFixed(1))
           dividerGlow.current.style.opacity = (0.35 + kin * 0.45).toFixed(3)
         }
 
@@ -319,8 +320,8 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
         const c2: [number, number] = [b[0] + side, b[1] - lift]
         const d = `M${a[0].toFixed(1)} ${a[1].toFixed(1)}C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`
         const thr = open * (0.55 + 0.45 * kin)
-        thread.current?.setAttribute('d', d)
-        threadGlow.current?.setAttribute('d', d)
+        setSvgAttribute(thread.current, 'd', d)
+        setSvgAttribute(threadGlow.current, 'd', d)
         if (thread.current) thread.current.style.opacity = (thr * 0.85).toFixed(3)
         if (threadGlow.current) threadGlow.current.style.opacity = (thr * 0.35).toFixed(3)
         // іскорки біжать від того, хто говорить, до того, хто слухає
@@ -331,8 +332,8 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
           const base = (i / n + t * 0.16) % 1
           const u = dir >= 0 ? base : 1 - base
           const pt = bez(a, c1, c2, b, u)
-          el.setAttribute('cx', pt[0].toFixed(1))
-          el.setAttribute('cy', pt[1].toFixed(1))
+          setSvgAttribute(el, 'cx', pt[0].toFixed(1))
+          setSvgAttribute(el, 'cy', pt[1].toFixed(1))
           const fade = Math.sin(base * Math.PI)
           el.style.opacity = (thr * fade * (dir === 0 ? 0.35 : 0.9)).toFixed(3)
         })

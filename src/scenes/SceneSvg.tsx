@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import type { FrameCtx, RegisterScene, SceneId } from '../stage/types'
 
 /**
@@ -21,7 +21,7 @@ export function SceneSvg({
   const ref = useRef<SVGSVGElement>(null)
   const upd = useRef(update)
   upd.current = update
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current
     return register(id, {
       el,
@@ -29,7 +29,8 @@ export function SceneSvg({
         if (el) upd.current(ctx, el)
       },
     })
-  }, [id, register])
+  // A changed plan/layout also needs an immediate frame while paused.
+  }, [id, register, update])
   return (
     <svg ref={ref} className="scene" data-scene={id} viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" style={{ display: 'none' }} aria-hidden="true" focusable="false">
       <title>{label}</title>

@@ -28,6 +28,24 @@
   width: 100%;
   height: 100%;
 }
+.stage {
+  contain: layout paint;
+  isolation: isolate;
+}
+.scene-rays {
+  mix-blend-mode: screen;
+}
+.app--compact .scene-rays {
+  mix-blend-mode: normal;
+}
+.app--compact .lyrics__line {
+  text-shadow: 0 1px 3px rgba(18, 10, 6, 0.9);
+}
+/* Hidden introductory effects otherwise keep compositing during the song. */
+.intro--leaving .intro__leaf,
+.intro--leaving .intro__button-glow {
+  animation: none;
+}
 .stage .scene {
   display: block;
   will-change: opacity;

@@ -1,5 +1,6 @@
-import { useImperativeHandle, useMemo, useRef, type Ref } from 'react'
+import { useContext, useImperativeHandle, useMemo, useRef, type Ref } from 'react'
 import { hash } from '../engine/math'
+import { CompactRendering } from '../stage/renderingProfile'
 
 /*
  * Спільні художні елементи. Увесь рух — функція від часу аудіо t,
@@ -74,9 +75,11 @@ export function LeafField({
   opacity?: number
   ref?: Ref<LeafFieldHandle>
 }) {
+  const compact = useContext(CompactRendering)
+  const visibleCount = compact ? Math.min(count, 12) : count
   const specs = useMemo<LeafSpec[]>(() => {
     const out: LeafSpec[] = []
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < visibleCount; i++) {
       const h = (k: number) => hash(seed * 97.13 + i * 13.7 + k * 3.31)
       out.push({
         x0: area.x + h(1) * area.w,
@@ -94,7 +97,7 @@ export function LeafField({
       })
     }
     return out
-  }, [count, area.x, area.y, area.w, area.h, seed, scale, speed, colors])
+  }, [visibleCount, area.x, area.y, area.w, area.h, seed, scale, speed, colors])
   const els = useRef<(SVGGElement | null)[]>([])
   useImperativeHandle(ref, () => ({
     update(t: number, amount = 1, wind = 0) {
@@ -102,12 +105,12 @@ export function LeafField({
       specs.forEach((s, i) => {
         const el = els.current[i]
         if (!el) return
-        const visible = i < Math.round(count * amount)
+        const visible = i < Math.round(visibleCount * amount)
         if (!visible) {
-          el.style.display = 'none'
+          if (el.style.display !== 'none') el.style.display = 'none'
           return
         }
-        el.style.display = ''
+        if (el.style.display !== '') el.style.display = ''
         const fall = (t * s.speed + s.off) % H
         const y = area.y - 40 + fall
         let x = s.x0 + Math.sin(t * s.freq + s.phase) * s.amp + (s.drift + wind * 60) * ((fall / H) * 2 - 1)
@@ -149,17 +152,23 @@ export function Motes({
   size?: number
   ref?: Ref<MotesHandle>
 }) {
+  const compact = useContext(CompactRendering)
+  const visibleCount = compact ? Math.min(count, 10) : count
   const specs = useMemo(
     () =>
-      Array.from({ length: count }, (_, i) => {
+      Array.from({ length: visibleCount }, (_, i) => {
         const h = (k: number) => hash(seed * 51.7 + i * 7.9 + k * 1.37)
         return { x: h(1), y: h(2), r: (0.5 + h(3)) * size, sp: 0.02 + h(4) * 0.05, ph: h(5) * 6.28, tw: 0.6 + h(6) * 1.4 }
       }),
-    [count, seed, size],
+    [visibleCount, seed, size],
   )
+  const group = useRef<SVGGElement>(null)
   const els = useRef<(SVGCircleElement | null)[]>([])
   useImperativeHandle(ref, () => ({
     update(t: number, amount = 1) {
+      const display = amount <= 0.001 ? 'none' : ''
+      if (group.current && group.current.style.display !== display) group.current.style.display = display
+      if (display === 'none') return
       specs.forEach((s, i) => {
         const el = els.current[i]
         if (!el) return
@@ -173,7 +182,7 @@ export function Motes({
     },
   }))
   return (
-    <g>
+    <g ref={group}>
       {specs.map((s, i) => (
         <circle key={i} ref={(n) => void (els.current[i] = n)} r={s.r} fill={color} />
       ))}
@@ -249,7 +258,7 @@ export function Glow({ id, x, y, rx, ry, color, opacity = 1, gref }: { id: strin
 /** Промені світла з вікна. */
 export function Rays({ id, from, to, color = '#ffe7b0', opacity = 0.5, gref }: { id: string; from: [number, number][]; to: [number, number][]; color?: string; opacity?: number; gref?: Ref<SVGGElement> }) {
   return (
-    <g ref={gref} opacity={opacity} style={{ mixBlendMode: 'screen' }}>
+    <g ref={gref} opacity={opacity} className="scene-rays">
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor={color} stopOpacity="0.75" />
