@@ -1,0 +1,33 @@
+name: Import site source
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-site-source
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Import source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f source-upload.zip
+          unzip -q -o source-upload.zip -d .
+          git add -- .gitignore README.md index.html package.json package-lock.json tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts src public tools
+          git rm -- source-upload.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Import complete site source"
+          git push origin HEAD:main
