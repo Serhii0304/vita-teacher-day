@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -24,19 +24,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Import reviewed animation update
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo 'ae54b2406b634a6d13a55e170444fd59330670cd1ea898763111c7d8e7d63bb7  performance-update.zip' | sha256sum --check
-          unzip -q -o performance-update.zip -d .
-          git add -- src tools README.md package.json
-          git rm -- performance-update.zip
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Optimize animation rendering for mobile and desktop"
-          git push origin HEAD:main
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
