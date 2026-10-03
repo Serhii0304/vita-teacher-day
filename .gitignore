@@ -1,0 +1,20 @@
+# залежності та збірка
+node_modules/
+dist/
+*.local
+*.tsbuildinfo
+
+# системні файли
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# налаштування редакторів / локальних інструментів
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.claude/
+
+# Оригінал пісні з кириличною назвою лежить поруч для зручності, але на сайті використовується
+# його точна копія public/audio/vita-teacher-day.mp3 (її і треба публікувати).
+/*.mp3
