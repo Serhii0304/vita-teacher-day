@@ -70,44 +70,16 @@ npm run dev
 
 ## Публікація на GitHub Pages
 
-Сайт уже налаштований для GitHub Pages: базовий шлях підставляється автоматично з налаштувань Pages, а workflow `.github/workflows/deploy.yml` встановлює залежності, збирає Vite-проєкт, завантажує `dist` і публікує його.
+- Репозиторій: [Serhii0304/vita-teacher-day](https://github.com/Serhii0304/vita-teacher-day).
+- Сайт: [serhii0304.github.io/vita-teacher-day](https://serhii0304.github.io/vita-teacher-day/).
 
-### 1. Створіть репозиторій
-На github.com → **New repository** → назва, наприклад, **`vita-teacher-day`** → Public (для безкоштовних Pages) → **Create repository** (без README, .gitignore і ліцензії — вони вже є).
+Сайт опубліковано й перевірено в Chrome 04.10.2026. Перше розгортання GitHub Pages завершилося успішно.
 
-### 2. Завантажте файли
-У папці проєкту:
+У **Settings → Pages → Build and deployment** налаштовано **Source: GitHub Actions**. Workflow `.github/workflows/deploy.yml` встановлює залежності через `npm ci`, збирає проєкт і публікує `dist`; базовий шлях береться з налаштувань Pages.
 
-```bash
-git init -b main
-```
-```bash
-git add .
-```
-```bash
-git commit -m "Музичне привітання для Віти"
-```
-```bash
-git remote add origin https://github.com/USERNAME/vita-teacher-day.git
-```
-```bash
-git push -u origin main
-```
+Наступні зміни в `main` запускають публікацію автоматично. Ручний запуск: **Actions → Deploy to GitHub Pages → Run workflow**. Результат і адресу розгортання показано у відповідному запуску Actions.
 
-Публікуються: `index.html`, `package.json`, `package-lock.json`, `tsconfig*.json`, `vite.config.ts`, `tools/`, `src/`, `public/` (разом із `public/audio/vita-teacher-day.mp3`, ≈8,9 МБ), `.github/workflows/deploy.yml`, `.gitignore`, `README.md`.
-Не публікуються (виключено в `.gitignore`): `node_modules/`, `dist/`, оригінальний mp3 із кириличною назвою, локальні налаштування.
-
-### 3. Увімкніть GitHub Pages
-Репозиторій → **Settings → Pages → Build and deployment → Source: «GitHub Actions»**.
-
-### 4. Запустіть публікацію
-- Автоматично: кожен `git push` у гілку `main`.
-- Вручну: вкладка **Actions → «Deploy to GitHub Pages» → Run workflow**.
-
-Через 1–2 хвилини у вкладці Actions з’явиться зелена позначка і посилання.
-
-### 5. Адреса сайту
-**`https://USERNAME.github.io/vita-teacher-day/`** (якщо назвати репозиторій інакше — `https://USERNAME.github.io/НАЗВА/`; для репозиторію `USERNAME.github.io` — корінь `https://USERNAME.github.io/`).
+У репозиторії зберігається пісня `public/audio/vita-teacher-day.mp3`. `node_modules/`, `dist/`, оригінальний MP3 у корені й локальні налаштування виключено через `.gitignore`.
 
 ### Інший хостинг
 `npm run build` створює `dist/` з відносними шляхами — цю папку можна покласти в корінь домену або в будь-яку підпапку. Для конкретного абсолютного шляху: `npx vite build --base /моя-папка/`.
@@ -168,6 +140,7 @@ git push -u origin main
 
 ## Що перевірено
 
+- 04.10.2026 на опублікованому сайті в Chrome: відтворення, пауза, вимкнення звуку, показ і приховування слів, вікно повного тексту, перемотування до 65, 158,6 і 220 с, природне завершення запису на 223,2 с та повтор із початку. Перевірено розміри 1534×1006, 390×844, 667×375 і 320×568 та великі підписи на початковому й фінальному екранах. Помилок і попереджень у консолі не виявлено.
 - 03.10.2026 виправлено накладання караоке на персонажів на низьких горизонтальних екранах: камера враховує всю висоту текстового блока, керування вміщується в один ряд із кнопками від 44×44 px. Перевірено 667×375, 568×320 та повернення до 390×844. У вікні повного тексту залишено одну прокрутку зі сталим заголовком і кнопкою закриття.
 - `npm run typecheck` і `npm run build` / `npm run build:pages` — без помилок.
 - Production-збірка з базою `/vita-teacher-day/` відкрита у браузері: JS, CSS, усі шрифти з кирилицею й mp3 завантажуються (mp3 віддається з `206 Partial Content`), dev-коду в збірці немає.
@@ -179,4 +152,3 @@ git push -u origin main
 
 - Плавність малювання (FPS) на реальних телефонах — заміряна лише вартість JS; малювання SVG залежить від пристрою.
 - Реальні iOS Safari / Android Chrome — перевірялося в емуляції розмірів екрана.
-- Публікацію на GitHub не виконано (за вашою вимогою — лише підготовлено).
