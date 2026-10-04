@@ -249,6 +249,8 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
         <path d="M-4000 -420 L-1600 -420 L-1500 -560 L-1300 -560 L-1240 -460 L-1200 -460 L-1200 -700 L-1150 -700 L-1150 -460 L1250 -460 L1300 -620 L1500 -620 L1560 -480 L4000 -480 V0 H-4000 Z" fill="#2a3047" />
         {/* її будинок */}
         <House x={g.herHouse.x} top={g.herHouse.top} w={g.herHouse.w} color="#c98f6e" roof="#7a3f2e" />
+      </WorldSvg>
+      <WorldSvg dynamic>
         {otherWins.map((w, i) => (
           <g key={i}>
             <rect x={w.x} y={w.y} width={100} height={140} fill="#2c2a3c" />
@@ -256,6 +258,8 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
             <path d={`M${w.x + 50} ${w.y} v140 M${w.x} ${w.y + 60} h100`} stroke="#e8d6bd" strokeWidth={6} />
           </g>
         ))}
+      </WorldSvg>
+      <WorldSvg>
         {/* його будинок */}
         <House x={g.hisHouse.x} top={g.hisHouse.top} w={g.hisHouse.w} color="#8a9a8c" roof="#3e4a52" />
         {Array.from({ length: 4 }, (_, i) => {
@@ -299,6 +303,8 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
       </WorldSvg>
       <WorldSvg>
         <WindowFrame x={hw.x} y={hw.y} w={hw.w} h={hw.h} />
+      </WorldSvg>
+      <WorldSvg dynamic>
         {/* букет у вазі на підвіконні (з’являється, коли вона його ставить) */}
         <g ref={sill} style={{ display: 'none' }}>
           <g transform={`translate(${hw.x + hw.w * 0.72} ${hw.y + hw.h - 4}) scale(0.62)`}>
@@ -313,6 +319,8 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
             </g>
           </g>
         </g>
+      </WorldSvg>
+      <WorldSvg>
         <WindowFrame x={mw.x} y={mw.y} w={mw.w} h={mw.h} />
       </WorldSvg>
 
@@ -382,4 +390,3 @@ function WindowFrame({ x, y, w, h }: { x: number; y: number; w: number; h: numbe
     </g>
   )
 }
-

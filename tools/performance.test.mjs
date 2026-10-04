@@ -4,6 +4,7 @@ import { FramePacer } from '../src/stage/framePacer.ts'
 import { sceneMounts } from '../src/stage/sceneMounts.ts'
 import { setSvgAttribute } from '../src/stage/svgAttributes.ts'
 import { cameraTransform, computeEnvelope, cropToEnvelope } from '../src/stage/envelope.ts'
+import { bitmapSize, STATIC_MAX_EDGE, STATIC_MAX_PIXELS, viewportWorld } from '../src/stage/rasterBudget.ts'
 import { armChain, gripWorld, targetForGrip } from '../src/characters/rigMath.ts'
 import { MAN, WOMAN } from '../src/characters/body.ts'
 import { restPose } from '../src/characters/pose.ts'
@@ -105,6 +106,74 @@ test('camera transform maps the view box exactly onto the screen', () => {
   const [x1, y1] = toScreen(vb[0] + vb[2], vb[1] + vb[3])
   assert.ok(Math.abs(x0) < 0.05 && Math.abs(y0) < 0.05)
   assert.ok(Math.abs(x1 - phone.w) < 0.05 && Math.abs(y1 - phone.h) < 0.05)
+})
+
+test('static bitmap backing stores obey both hard budgets for large, tall and wide scenes', () => {
+  for (const [cssW, cssH] of [[1509, 1580], [2085, 2252], [12000, 12000], [12000, 600], [600, 12000], [384, 696], [0.5, 0.5]]) {
+    const { width, height } = bitmapSize(cssW, cssH)
+    const label = `${cssW}×${cssH} → ${width}×${height}`
+    assert.ok(Number.isInteger(width) && Number.isInteger(height), label)
+    assert.ok(width >= 1 && height >= 1, label)
+    assert.ok(width <= STATIC_MAX_EDGE && height <= STATIC_MAX_EDGE, `${label}: edge budget`)
+    assert.ok(width * height <= STATIC_MAX_PIXELS, `${label}: pixel budget`)
+    // Pixel rounding may lose at most one pixel on either edge; it must not stretch the artwork.
+    assert.ok(Math.abs(width * cssH - height * cssW) <= Math.max(cssW, cssH), `${label}: aspect ratio`)
+  }
+  const square = bitmapSize(12000, 12000)
+  assert.ok(square.width * square.height > STATIC_MAX_PIXELS * 0.99, 'large square uses the available area budget')
+  assert.equal(bitmapSize(12000, 600).width, STATIC_MAX_EDGE, 'wide scene is limited by its long edge')
+  assert.equal(bitmapSize(600, 12000).height, STATIC_MAX_EDGE, 'tall scene is limited by its long edge')
+  assert.deepEqual(bitmapSize(384, 696), { width: 672, height: 1218 }, 'small worlds retain 1.75× detail without a DPR multiplier')
+})
+
+const parseViewportTransform = (value) => {
+  const match = /^translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)$/.exec(value)
+  assert.ok(match, `unexpected viewport transform: ${value}`)
+  return { tx: Number(match[1]), ty: Number(match[2]), s: Number(match[3]) }
+}
+
+test('moving SVG viewports stay screen-sized and cancel the camera at corners and interior points', () => {
+  for (const scr of [phone, { ...phone, w: 844, h: 390, layout: 'wide' }, { ...phone, w: 384, h: 320 }]) {
+    for (const k of [0.14, 0.466, 1.8]) {
+      const env = { x: -2600.4, y: -1800.7, w: 6500, h: 7200, k }
+      const vb = [-130.25, -470.125, 540.75, 540.75 * scr.h / scr.w]
+      const viewport = viewportWorld(env, vb, scr)
+      assert.ok(viewport.width >= scr.w && viewport.width <= scr.w + 64)
+      assert.ok(viewport.height >= scr.h && viewport.height <= scr.h + 64)
+      const camera = parse(cameraTransform(env, vb, scr))
+      const inverse = parseViewportTransform(viewport.transform)
+      const box = viewport.viewBox.split(' ').map(Number)
+      assert.ok(box[0] < vb[0] && box[1] < vb[1], 'overscan before visible frame')
+      assert.ok(box[0] + box[2] > vb[0] + vb[2] && box[1] + box[3] > vb[1] + vb[3], 'overscan after visible frame')
+      for (const [u, v] of [[0, 0], [1, 0], [0, 1], [1, 1], [0.37, 0.62]]) {
+        const wx = vb[0] + u * vb[2]
+        const wy = vb[1] + v * vb[3]
+        const localX = (wx - box[0]) * viewport.width / box[2]
+        const localY = (wy - box[1]) * viewport.height / box[3]
+        const actualX = camera.tx + camera.s * (inverse.tx + inverse.s * localX)
+        const actualY = camera.ty + camera.s * (inverse.ty + inverse.s * localY)
+        assert.ok(Math.abs(actualX - u * scr.w) < 0.08, `x alignment: ${actualX} vs ${u * scr.w}`)
+        assert.ok(Math.abs(actualY - v * scr.h) < 0.08, `y alignment: ${actualY} vs ${v * scr.h}`)
+      }
+    }
+  }
+})
+
+test('a retained viewport remains aligned when the camera moves between heavy frames', () => {
+  const env = { x: -2600, y: -1800, w: 6500, h: 7200, k: 0.466 }
+  const base = [-100, -450, 540, 540 * phone.h / phone.w]
+  const viewport = viewportWorld(env, base, phone)
+  const inverse = parseViewportTransform(viewport.transform)
+  const box = viewport.viewBox.split(' ').map(Number)
+  const next = [-94, -448, 534, 534 * phone.h / phone.w]
+  const camera = parse(cameraTransform(env, next, phone))
+  const point = [base[0] + base[2] * 0.4, base[1] + base[3] * 0.6]
+  const localX = (point[0] - box[0]) * viewport.width / box[2]
+  const localY = (point[1] - box[1]) * viewport.height / box[3]
+  const actualX = camera.tx + camera.s * (inverse.tx + inverse.s * localX)
+  const actualY = camera.ty + camera.s * (inverse.ty + inverse.s * localY)
+  assert.ok(Math.abs(actualX - (point[0] - next[0]) * phone.w / next[2]) < 0.08)
+  assert.ok(Math.abs(actualY - (point[1] - next[1]) * phone.h / next[3]) < 0.08)
 })
 
 test('arms: holding something in front keeps the elbow by the torso and the wrist on target', () => {

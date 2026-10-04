@@ -198,7 +198,11 @@ export function ClassroomScene({ layout, register }: { layout: Layout; register:
 
         {/* дошка, дитячі малюнки, стіл */}
         <KidsDrawings x={140} y={-800} w={560} />
+      </WorldSvg>
+      <WorldSvg dynamic>
         <ChalkBoard x={140} y={-660} w={560} h={330} glowRef={boardGlow} chalkRef={chalk} />
+      </WorldSvg>
+      <WorldSvg>
         <TeacherDesk x={360} y={-150} w={400} />
         <Books x={400} y={-150} s={1} />
         <Globe x={680} y={-150} s={1} />
