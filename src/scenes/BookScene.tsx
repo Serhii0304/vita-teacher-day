@@ -220,9 +220,13 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         <circle cx={570} cy={-120} r={70} fill="url(#bk-cup)" />
         <ellipse cx={548} cy={-142} rx={26} ry={12} fill="#fff" opacity={0.18} />
         <circle cx={570} cy={-120} r={86} fill="none" stroke="#c46b45" strokeWidth={5} opacity={0.7} />
+      </g>
+      </WorldSvg>
+      <WorldSvg dynamic>
         <path ref={steam1} d="M560 -170" stroke="#fffaf0" strokeWidth={8} strokeLinecap="round" fill="none" opacity={0.3} />
         <path ref={steam2} d="M584 -168" stroke="#fffaf0" strokeWidth={6} strokeLinecap="round" fill="none" opacity={0.25} />
-      </g>
+      </WorldSvg>
+      <WorldSvg>
       {/* олівець */}
       <g transform="translate(470 140) rotate(-24)">
         <rect x={-110} y={-7} width={190} height={14} rx={3} fill="#d9b26a" />
@@ -231,9 +235,12 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         <rect x={-120} y={-7} width={14} height={14} rx={3} fill="#c98b8b" />
       </g>
 
+      </WorldSvg>
       {/* альбом */}
-      <g>
+      <WorldSvg dynamic>
         <rect ref={shadow} x={-14} y={-BH / 2 - 10} width={BW + 28} height={BH + 26} rx={10} fill="#000" opacity={0.22} />
+      </WorldSvg>
+      <WorldSvg>
         {/* права сторінка з ілюстрацією вікна */}
         <rect x={0} y={-BH / 2} width={BW} height={BH} fill="url(#bk-page)" />
         <g>
@@ -245,7 +252,6 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
             </RoomWindow>
           </g>
         </g>
-      </g>
       </WorldSvg>
       {/* листопад у намальованому вікні сторінки — окремий шар */}
       <LeafLayer
@@ -259,17 +265,20 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         unit={K}
       />
       <WorldSvg>
-      <g>
-        <g>
-          <g transform={PAGE_TR}>
-            <RoomWindow id="bk-win" part="frame" x={ROOM_WINDOW.x} y={ROOM_WINDOW.y} w={ROOM_WINDOW.w} h={ROOM_WINDOW.h} />
-          </g>
-          <rect ref={veil} x={PW.cx - PW.w / 2 - 18} y={PW.cy - PW.h / 2 - 18} width={PW.w + 36} height={PW.h + 46} fill="#f6eedf" opacity={0.32} />
-          <text x={PW.cx} y={PW.cy + PW.h / 2 + 64} textAnchor="middle" fontFamily="'Marck Script', cursive" fontSize={22} fill="#8a6a4e" opacity={0.85}>
-            осінь за шкільним вікном
-          </text>
+        <g transform={PAGE_TR}>
+          <RoomWindow id="bk-win" part="frame" x={ROOM_WINDOW.x} y={ROOM_WINDOW.y} w={ROOM_WINDOW.w} h={ROOM_WINDOW.h} />
         </g>
+      </WorldSvg>
+      <WorldSvg dynamic>
+        <rect ref={veil} x={PW.cx - PW.w / 2 - 18} y={PW.cy - PW.h / 2 - 18} width={PW.w + 36} height={PW.h + 46} fill="#f6eedf" opacity={0.32} />
+        <text x={PW.cx} y={PW.cy + PW.h / 2 + 64} textAnchor="middle" fontFamily="'Marck Script', cursive" fontSize={22} fill="#8a6a4e" opacity={0.85}>
+          осінь за шкільним вікном
+        </text>
+      </WorldSvg>
+      <WorldSvg>
         <rect x={-3} y={-BH / 2} width={6} height={BH} fill="#d6c7ad" />
+      </WorldSvg>
+      <WorldSvg dynamic>
         {/* обкладинка */}
         <path ref={cover} d="" fill="#2f5b5d" />
         <g ref={coverOut}>
@@ -299,7 +308,6 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
             </text>
           </g>
         </g>
-      </g>
 
       </WorldSvg>
       <MoteLayer ref={motes} count={22} area={{ x: -900, y: -600, w: 1700, h: 1100 }} seed={11} size={3.2} />
@@ -307,4 +315,3 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
     </SceneFrame>
   )
 }
-

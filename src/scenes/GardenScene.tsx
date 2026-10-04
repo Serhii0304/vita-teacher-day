@@ -414,6 +414,8 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
       <WorldSvg>
         {/* невеликий столик із двома чашками перед лавкою */}
         <CafeTable x={TABLE.x} y={TABLE.y} s={0.9} />
+      </WorldSvg>
+      <WorldSvg dynamic>
         <g ref={cupW}>
           <TableCupStatic x={CUP_W.x} y={CUP_W.y} color="#c46b45" />
         </g>
@@ -478,4 +480,3 @@ function TableCupStatic({ x, y, color }: { x: number; y: number; color: string }
     </g>
   )
 }
-
