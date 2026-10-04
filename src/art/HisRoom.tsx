@@ -118,7 +118,11 @@ export function HisRoom({ ref }: { ref?: Ref<HisRoomHandle> }) {
         {/* полиця з книжками і годинник */}
         <rect x={-640} y={-520} width={300} height={12} fill="#8a5d3b" />
         <Books x={-626} y={-520} s={0.9} colors={['#c46b45', '#d9b26a', '#2f5b5d', '#7f9a86', '#b8935f']} />
+      </WorldSvg>
+      <WorldSvg dynamic>
         <WallClock x={-470} y={-680} r={42} minRef={minH} hourRef={hourH} />
+      </WorldSvg>
+      <WorldSvg>
         {/* картина-пейзаж (гори і море) */}
         <g>
           <rect x={-330} y={-720} width={220} height={150} fill="#b8935f" />
@@ -145,6 +149,8 @@ export function HisRoom({ ref }: { ref?: Ref<HisRoomHandle> }) {
         <Rug x={HIS.chairX - 30} y={70} w={600} h={92} color="#3f5d63" border="#d9b26a" />
         <ArmchairBack x={HIS.chairX} y={HIS.chairY} s={HIS.chairS} flip={-1} c="#7a4a32" d="#5e3524" l="#94603f" />
         <SideTable x={HIS.tableX} y={0} s={0.95} />
+      </WorldSvg>
+      <WorldSvg dynamic>
         <g ref={cup}>
           <path d={`M${HIS.cupX - 13} ${HIS.tableTop - 2} h26`} stroke="#c9bfa9" strokeWidth={4} strokeLinecap="round" />
           <path d={`M${HIS.cupX - 8} ${HIS.tableTop - 18} h16 l-1.4 14 c-0.3 2 -1.8 3 -3.6 3 h-6 c-1.8 0 -3.3 -1 -3.6 -3 Z`} fill="#e9e2d2" />

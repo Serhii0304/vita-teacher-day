@@ -112,64 +112,79 @@ export function HerRoom({ id, ref }: { id: string; ref?: Ref<HerRoomHandle> }) {
       </WorldSvg>
       {/* ніч за вікном густішає — лише прозорість окремого шару (рама вікна лежить поверх) */}
       <FxLayer ref={night} bounds={panes} initialOpacity={0} fill="#141c33" />
-      <WorldSvg>
+      <WorldSvg dynamic>
         <g clipPath={`url(#${id}-win-clip)`}>
           <g ref={moon}>
             <circle cx={WIN.x + WIN.w * 0.3} cy={WIN.y + WIN.h * 0.42} r={20} fill="#f7ecd6" opacity={0.9} />
           </g>
         </g>
+      </WorldSvg>
+      <WorldSvg>
         <RoomWindow id={`${id}-win`} part="frame" x={WIN.x} y={WIN.y} w={WIN.w} h={WIN.h} frame="#ece0cc" frameShade="#cdbb9f" />
         <Curtain x={WIN.x + WIN.w + 80} y={WIN.y - 40} h={WIN.h + 90} side="right" color="#c98b8b" shade="#a96d6e" />
         <rect x={WIN.x - 110} y={WIN.y - 56} width={WIN.w + 220} height={12} rx={6} fill="#8a6a4e" />
+      </WorldSvg>
+      <WorldSvg dynamic>
         <g ref={vase} style={{ display: 'none' }}>
           <g ref={vaseBloom}>
             <VaseBouquet x={WIN.x + WIN.w - 90} y={WIN.y + WIN.h - 2} s={1.15} />
           </g>
         </g>
+      </WorldSvg>
+      <WorldSvg>
         <PottedPlant x={WIN.x + 60} y={WIN.y + WIN.h - 2} s={0.75} />
+      </WorldSvg>
 
-        {/* годинник */}
+      {/* годинник */}
+      <WorldSvg dynamic>
         <WallClock x={-20} y={-660} r={44} minRef={minH} hourRef={hourH} />
+      </WorldSvg>
 
-        {/* дитячі листівки-подяки на корковій дошці */}
-        <g>
-          <defs>
-            <radialGradient id={`${id}-cards`}>
-              <stop offset="0" stopColor="#ffc979" stopOpacity="0.5" />
-              <stop offset="0.45" stopColor="#ffb75e" stopOpacity="0.18" />
-              <stop offset="1" stopColor="#ffb75e" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <rect x={HER.boardX - 10} y={-610} width={210} height={150} rx={6} fill="#b78b5e" />
-          <rect x={HER.boardX - 2} y={-602} width={194} height={134} rx={4} fill="#c99e6e" />
-          <g ref={cards} opacity={0}>
-            <ellipse cx={HER.boardX + 95} cy={-535} rx={160} ry={110} fill={`url(#${id}-cards)`} />
-          </g>
-          <g transform={`translate(${HER.boardX + 18} -592) rotate(-5)`}>
-            <rect width={58} height={70} fill="#fff8ea" />
-            <circle cx={29} cy={26} r={12} fill="#f2b84a" />
-            <path d="M14 54 Q29 44 44 54" stroke="#c46b45" strokeWidth={3} fill="none" />
-          </g>
-          <g transform={`translate(${HER.boardX + 84} -596) rotate(4)`}>
-            <rect width={52} height={64} fill="#f2faf2" />
-            <path d="M26 54 V30" stroke="#6f8f68" strokeWidth={2.4} />
-            {Array.from({ length: 6 }, (_, i) => (
-              <ellipse key={i} cx={26} cy={18} rx={4} ry={8} fill="#c98bb9" transform={`rotate(${i * 60} 26 26)`} />
-            ))}
-            <circle cx={26} cy={26} r={4} fill="#f2c25e" />
-          </g>
-          <g transform={`translate(${HER.boardX + 140} -588) rotate(-3)`}>
-            <rect width={46} height={60} fill="#fff3e8" />
-            <path d="M8 46 C2 30 16 14 34 16 C36 32 24 44 8 46 Z" fill="#e2a640" />
-          </g>
-          <g transform={`translate(${HER.boardX + 40} -530) rotate(3)`}>
-            <rect width={110} height={52} fill="#fdf1dd" />
-            <text x={55} y={32} textAnchor="middle" fontFamily="'Marck Script', cursive" fontSize={20} fill="#c46b45">
-              Дякуємо!
-            </text>
-          </g>
+      {/* дитячі листівки-подяки на корковій дошці */}
+      <WorldSvg>
+        <defs>
+          <radialGradient id={`${id}-cards`}>
+            <stop offset="0" stopColor="#ffc979" stopOpacity="0.5" />
+            <stop offset="0.45" stopColor="#ffb75e" stopOpacity="0.18" />
+            <stop offset="1" stopColor="#ffb75e" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <rect x={HER.boardX - 10} y={-610} width={210} height={150} rx={6} fill="#b78b5e" />
+        <rect x={HER.boardX - 2} y={-602} width={194} height={134} rx={4} fill="#c99e6e" />
+      </WorldSvg>
+      <WorldSvg dynamic>
+        <g ref={cards} opacity={0}>
+          <ellipse cx={HER.boardX + 95} cy={-535} rx={160} ry={110} fill={`url(#${id}-cards)`} />
         </g>
-
+      </WorldSvg>
+      <WorldSvg>
+        <g transform={`translate(${HER.boardX + 18} -592) rotate(-5)`}>
+          <rect width={58} height={70} fill="#fff8ea" />
+          <circle cx={29} cy={26} r={12} fill="#f2b84a" />
+          <path d="M14 54 Q29 44 44 54" stroke="#c46b45" strokeWidth={3} fill="none" />
+        </g>
+        <g transform={`translate(${HER.boardX + 84} -596) rotate(4)`}>
+          <rect width={52} height={64} fill="#f2faf2" />
+          <path d="M26 54 V30" stroke="#6f8f68" strokeWidth={2.4} />
+          {Array.from({ length: 6 }, (_, i) => (
+            <ellipse key={i} cx={26} cy={18} rx={4} ry={8} fill="#c98bb9" transform={`rotate(${i * 60} 26 26)`} />
+          ))}
+          <circle cx={26} cy={26} r={4} fill="#f2c25e" />
+        </g>
+        <g transform={`translate(${HER.boardX + 140} -588) rotate(-3)`}>
+          <rect width={46} height={60} fill="#fff3e8" />
+          <path d="M8 46 C2 30 16 14 34 16 C36 32 24 44 8 46 Z" fill="#e2a640" />
+        </g>
+      </WorldSvg>
+      <WorldSvg dynamic>
+        <g transform={`translate(${HER.boardX + 40} -530) rotate(3)`}>
+          <rect width={110} height={52} fill="#fdf1dd" />
+          <text x={55} y={32} textAnchor="middle" fontFamily="'Marck Script', cursive" fontSize={20} fill="#c46b45">
+            Дякуємо!
+          </text>
+        </g>
+      </WorldSvg>
+      <WorldSvg>
         {/* книжкова шафа */}
         <Bookshelf x={420} y={-760} w={240} h={740} />
         <Books x={438} y={-760} s={0.7} colors={['#d9b26a', '#7f9a86', '#c46b45', '#8e6d8c', '#2f5b5d']} />
@@ -178,6 +193,8 @@ export function HerRoom({ id, ref }: { id: string; ref?: Ref<HerRoomHandle> }) {
         <Rug x={HER.chairX + 30} y={70} w={620} h={96} />
         <ArmchairBack x={HER.chairX} y={HER.chairY} s={HER.chairS} />
         <SideTable x={HER.tableX} y={0} s={0.95} />
+      </WorldSvg>
+      <WorldSvg dynamic>
         <g ref={notes} style={{ display: 'none' }}>
           <rect x={HER.tableX - 52} y={HER.tableTop - 8} width={64} height={8} fill="#7f9a86" />
           <rect x={HER.tableX - 50} y={HER.tableTop - 15} width={64} height={7} fill="#c46b45" />
@@ -196,7 +213,7 @@ export function HerRoom({ id, ref }: { id: string; ref?: Ref<HerRoomHandle> }) {
           <LampGlow />
         </g>
       </FxLayer>
-      <WorldSvg>
+      <WorldSvg dynamic>
         <TableLamp x={HER.lampX} y={HER.tableTop} s={1} glow={false} shadeRef={lampShade} />
       </WorldSvg>
       {/* загальне освітлення: прохолодний вечір → тепло лампи */}
