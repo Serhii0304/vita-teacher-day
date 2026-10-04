@@ -4,10 +4,19 @@ import { FramePacer } from '../src/stage/framePacer.ts'
 import { sceneMounts } from '../src/stage/sceneMounts.ts'
 import { setSvgAttribute } from '../src/stage/svgAttributes.ts'
 import { cameraTransform, computeEnvelope, cropToEnvelope } from '../src/stage/envelope.ts'
-import { bitmapSize, STATIC_MAX_EDGE, STATIC_MAX_PIXELS, viewportWorld } from '../src/stage/rasterBudget.ts'
+import { bitmapSize, mobileFrameSize, STATIC_MAX_EDGE, STATIC_MAX_PIXELS, viewportWorld } from '../src/stage/rasterBudget.ts'
 import { armChain, gripWorld, targetForGrip } from '../src/characters/rigMath.ts'
 import { MAN, WOMAN } from '../src/characters/body.ts'
 import { restPose } from '../src/characters/pose.ts'
+
+test('mobile output stays below 600k pixels in portrait, landscape and split-screen', () => {
+  for (const [w, h] of [[384, 696], [696, 384], [412, 915], [384, 348], [1200, 520], [4000, 3000]]) {
+    const size = mobileFrameSize(w, h)
+    assert.ok(size.width * size.height <= 600_000)
+    assert.ok(Math.max(size.width, size.height) <= 1280)
+    assert.ok(Math.abs(size.width / size.height - w / h) < 0.01)
+  }
+})
 
 test('30 FPS budget stays stable on 60, 90, 120 and 144 Hz displays', () => {
   for (const hz of [60, 90, 120, 144]) {
