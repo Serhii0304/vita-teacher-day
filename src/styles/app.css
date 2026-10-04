@@ -779,6 +779,21 @@
 }
 
 /* Розмова телефоном: дві панелі з власними камерами, лінія світла між ними */
+/* діагностична панель (?perf) */
+.perf-hud {
+  position: fixed;
+  left: 6px;
+  top: 6px;
+  z-index: 50;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(20, 12, 8, 0.72);
+  color: #f6ebd9;
+  font: 11px/1.35 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre;
+  pointer-events: none;
+}
 .phone__bg {
   position: absolute;
   inset: 0;

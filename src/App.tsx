@@ -5,6 +5,7 @@ import { FinalScreen } from './components/FinalScreen'
 import { IntroScreen } from './components/IntroScreen'
 import { LyricsDialog } from './components/LyricsDialog'
 import { LyricsOverlay } from './components/LyricsOverlay'
+import { PerfHud, perfHudEnabled } from './components/PerfHud'
 import { PlayerControls } from './components/PlayerControls'
 import { StatusLayer } from './components/StatusLayer'
 import { useReducedMotion } from './hooks/useReducedMotion'
@@ -121,6 +122,7 @@ export function App() {
       </main>
       <IntroScreen visible={!started} onStart={start} />
       <LyricsDialog open={textOpen} onClose={() => setTextOpen(false)} />
+      {perfHudEnabled() && <PerfHud compact={compact} />}
       {DevTools && (
         <Suspense fallback={null}>
           <DevTools bus={bus} engine={engine} onStart={() => setStarted(true)} />

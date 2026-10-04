@@ -5,6 +5,7 @@ import { timelineStore, type Timeline } from '../story/timeline'
 import type { FrameBus } from './frameBus'
 import type { Screen } from './types'
 import { FramePacer } from './framePacer'
+import { perf } from './perfStats'
 
 /**
  * Єдиний цикл кадрів. Під час відтворення працює requestAnimationFrame і читає час з аудіо.
@@ -26,12 +27,15 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
     // важкі: персонажі й зміни SVG — на телефоні 30 на секунду
     const pacer = new FramePacer()
     const heavyPacer = new FramePacer()
-    // Запобіжник для слабких телефонів: якщо пристрій стабільно не встигає за легкими кадрами,
-    // їх частота знижується до 30 (як було раніше), а далі, за потреби, важких — до 20.
+    // Запобіжник для слабших телефонів: якщо пристрій двічі поспіль (по 2 с) не встигає за легкими кадрами,
+    // їх частота знижується до 30 (як було раніше), а згодом пробуємо 60 знову; за потреби важкі кадри — до 20.
     let lightCap = 60
     let heavyCap = 30
     let winStart = 0
     let winFrames = 0
+    let strikes = 0
+    let retryAt = 0
+    let retryGap = 15000
     const adapt = (now: number, playing: boolean) => {
       if (!playing || !compactRef.current || reducedRef.current) {
         winStart = 0
@@ -46,10 +50,24 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       const span = now - winStart
       if (span < 2000) return
       const fps = (winFrames * 1000) / span
-      if (lightCap > 30 && fps < 45) lightCap = 30
-      else if (lightCap <= 30 && heavyCap > 20 && fps < 24) heavyCap = 20
       winStart = now
       winFrames = 0
+      const slow = lightCap > 30 ? fps < 45 : heavyCap > 20 && fps < 24
+      strikes = slow ? strikes + 1 : 0
+      if (strikes >= 2) {
+        strikes = 0
+        if (lightCap > 30) {
+          lightCap = 30
+          retryAt = now + retryGap
+          retryGap = Math.min(retryGap * 2, 120000)
+        } else heavyCap = 20
+      } else if (lightCap === 30 && heavyCap > 20 && retryAt && now >= retryAt) {
+        // спроба повернути плавні 60 кадрів (наприклад, після важкого переходу між сценами)
+        lightCap = 60
+        retryAt = 0
+      }
+      perf.lightCap = lightCap
+      perf.heavyCap = heavyCap
     }
     let keysFor: Timeline | null = null
     let keys: number[] = []
@@ -73,7 +91,9 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       const tReal = engine.time()
       const t = reducedRef.current ? snapToKey(keys, tReal) : tReal
       if (force || tReal !== lastTime) {
+        const t0 = performance.now()
         bus.run({ t, tReal, tl, screen: screen.current!, reduced: reducedRef.current, heavy })
+        perf.frame(t0, performance.now(), heavy)
         lastTime = tReal
       }
       force = false
