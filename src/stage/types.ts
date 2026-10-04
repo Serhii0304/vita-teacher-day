@@ -31,8 +31,12 @@ export interface Rect {
 export type SceneId = 'book' | 'classroom' | 'evening' | 'chorus1' | 'phone' | 'windows' | 'garden'
 
 export interface SceneRuntime {
-  el: SVGSVGElement | null
+  el: HTMLElement | SVGElement | null
   update(ctx: FrameCtx): void
+  /** Крок «прогріву» ще невидимої сцени (вмикає наступний шар); true — усе готово. */
+  warm?(): boolean
+  /** Показати всі шари одразу (сцена вже на екрані, напр. після перемотування). */
+  reveal?(): void
 }
 
 export type RegisterScene = (id: SceneId, rt: SceneRuntime) => () => void

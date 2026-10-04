@@ -1,3 +1,5 @@
+import { solveIK, type IKResult } from '../engine/ik'
+import { clamp, smoothstep } from '../engine/math'
 import type { Params } from '../engine/moves'
 import type { BodySpec } from './body'
 
@@ -33,6 +35,54 @@ export function charToTorso(p: Params, body: BodySpec, cx: number, cy: number): 
   return rot(cx - p.px, cy - (body.pelvisY + p.py), -p.lean)
 }
 
+/** Наскільки лікоть може відійти за лінію плеча (од.), коли рука тримає предмет перед собою. */
+const ELBOW_BACK = 6
+
+export interface ArmChain {
+  /** Масштаби довжини плеча й передпліччя (перспективне скорочення). */
+  k1: number
+  k2: number
+  ik: IKResult
+}
+
+/**
+ * Ланцюг руки (плече → лікоть → зап’ястя) у системі торса, відносно плечового суглоба.
+ * fs — скорочення всієї руки, спрямованої до глядача (телефон біля вуха).
+ *
+ * Коли кисть попереду на рівні грудей чи живота (тримає книгу, букет, чашку, рука на серці),
+ * передпліччя насправді спрямоване вперед-до глядача. Якщо малювати його на повну довжину,
+ * лікоть «стирчить» далеко за спину — саме це виглядало неприродно. Тож передпліччя скорочується
+ * рівно настільки, щоб лікоть лишився біля тулуба; кисть при цьому стоїть у тій самій точці.
+ * Для опущених рук (стоїть, іде) обмеження плавно вимикається.
+ */
+export function armChain(body: BodySpec, hx: number, hy: number, fs: number): ArmChain {
+  const k1 = 1 - 0.62 * clamp(fs)
+  const k2 = 1 - 0.45 * clamp(fs)
+  const L1 = body.upper * k1
+  const ik = solveIK(0, 0, hx, hy, L1, body.fore * k2, 1)
+  const reach = body.upper + body.fore
+  // вага обмеження: передпліччя спрямоване вперед (кисть попереду ліктя), а кисть піднята
+  // вище за звичне «опущене» положення (у ході й у спокої рука висить вільно)
+  const w = smoothstep(4, 16, hx - ik.jx) * (1 - smoothstep(0.8 * reach, 0.93 * reach, hy))
+  const limit = -ELBOW_BACK - (1 - w) * 80
+  if (w <= 0 || ik.jx >= limit) return { k1, k2, ik }
+  // найкоротше передпліччя, з яким кисть ще дістає до цілі
+  const d = Math.hypot(hx, hy)
+  let lo = Math.max(0.3, Math.min(k2, (d - L1 * 0.9995) / body.fore + 0.01))
+  let hi = k2
+  let best = solveIK(0, 0, hx, hy, L1, body.fore * lo, 1)
+  if (best.jx < limit) return { k1, k2: lo, ik: best }
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2
+    const r = solveIK(0, 0, hx, hy, L1, body.fore * mid, 1)
+    if (r.jx >= limit) {
+      lo = mid
+      best = r
+    } else hi = mid
+  }
+  return { k1, k2: lo, ik: best }
+}
+
 const handScale = (body: BodySpec) => (body.kind === 'woman' ? 1 : 1.12)
 const GRIP: [number, number] = [1.5, 13.5]
 
@@ -44,7 +94,8 @@ export function gripWorld(p: Params, body: BodySpec, side: 'n' | 'f'): [number, 
   const w = side === 'n' ? p.nw : p.fw
   // зап’ястя (з урахуванням досяжності руки)
   const fs = (side === 'n' ? p.nFS : p.fFS) ?? 0
-  const L = (body.upper * (1 - 0.62 * fs) + body.fore * (1 - 0.45 * fs)) * 0.9995
+  const { k1, k2 } = armChain(body, hx, hy, fs)
+  const L = (body.upper * k1 + body.fore * k2) * 0.9995
   const d = Math.hypot(hx, hy) || 1
   const k = Math.min(1, L / d)
   const [wx, wy] = torsoToChar(p, body, sh[0] + hx * k, sh[1] + hy * k)

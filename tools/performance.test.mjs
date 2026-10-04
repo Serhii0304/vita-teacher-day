@@ -3,6 +3,10 @@ import assert from 'node:assert/strict'
 import { FramePacer } from '../src/stage/framePacer.ts'
 import { sceneMounts } from '../src/stage/sceneMounts.ts'
 import { setSvgAttribute } from '../src/stage/svgAttributes.ts'
+import { cameraTransform, computeEnvelope } from '../src/stage/envelope.ts'
+import { armChain, gripWorld, targetForGrip } from '../src/characters/rigMath.ts'
+import { MAN, WOMAN } from '../src/characters/body.ts'
+import { restPose } from '../src/characters/pose.ts'
 
 test('30 FPS budget stays stable on 60, 90, 120 and 144 Hz displays', () => {
   for (const hz of [60, 90, 120, 144]) {
@@ -42,6 +46,8 @@ const schedule = [
 
 test('prewarm, crossfade, final frame and arbitrary backwards seek retain required scenes', () => {
   assert.deepEqual(sceneMounts(schedule, 0), ['book'])
+  assert.deepEqual(sceneMounts(schedule, 4.99), ['book'])
+  assert.deepEqual(sceneMounts(schedule, 5), ['book', 'classroom'])
   assert.deepEqual(sceneMounts(schedule, 8), ['book', 'classroom'])
   assert.deepEqual(sceneMounts(schedule, 10), ['book', 'classroom'])
   assert.deepEqual(sceneMounts(schedule, 11.49), ['book', 'classroom'])
@@ -66,4 +72,68 @@ test('unchanged geometry is not written; replacement elements still receive it',
   const b = element()
   setSvgAttribute(b, 'viewBox', '0 0 915 412')
   assert.equal(b.writes, 1)
+})
+
+const phone = { w: 390, h: 844, layout: 'tall', reservedBottom: 210, reservedTop: 20 }
+const parse = (tr) => {
+  const m = /translate3d\(([-\d.]+)px, ([-\d.]+)px, 0\) scale\(([\d.]+)\)/.exec(tr)
+  return { tx: Number(m[1]), ty: Number(m[2]), s: Number(m[3]) }
+}
+
+test('camera layer: every frame fits the raster envelope and is never upscaled at full quality', () => {
+  // камера, що одночасно їде й наїжджає
+  const view = (t) => {
+    const w = 320 + 180 * Math.sin(t)
+    return [t * 40 - w / 2, -w, w, (w * phone.h) / phone.w]
+  }
+  const env = computeEnvelope(view, 0, 10, phone, 1)
+  for (let t = 0; t <= 10; t += 0.05) {
+    const vb = view(t)
+    assert.ok(vb[0] >= env.x - 0.5 && vb[1] >= env.y - 0.5, `t=${t}: frame starts outside the envelope`)
+    assert.ok(vb[0] + vb[2] <= env.x + env.w + 0.5 && vb[1] + vb[3] <= env.y + env.h + 0.5, `t=${t}: frame ends outside the envelope`)
+    const { s } = parse(cameraTransform(env, vb, phone))
+    assert.ok(s <= 1.0002, `t=${t}: layer upscaled ${s}`)
+  }
+})
+
+test('camera transform maps the view box exactly onto the screen', () => {
+  const env = { x: -500, y: -400, w: 1000, h: 900, k: 1.5 }
+  const vb = [-120, -200, 300, (300 * phone.h) / phone.w]
+  const { tx, ty, s } = parse(cameraTransform(env, vb, phone))
+  const toScreen = (wx, wy) => [tx + s * (wx - env.x) * env.k, ty + s * (wy - env.y) * env.k]
+  const [x0, y0] = toScreen(vb[0], vb[1])
+  const [x1, y1] = toScreen(vb[0] + vb[2], vb[1] + vb[3])
+  assert.ok(Math.abs(x0) < 0.05 && Math.abs(y0) < 0.05)
+  assert.ok(Math.abs(x1 - phone.w) < 0.05 && Math.abs(y1 - phone.h) < 0.05)
+})
+
+test('arms: holding something in front keeps the elbow by the torso and the wrist on target', () => {
+  for (const body of [WOMAN, MAN]) {
+    for (const [hx, hy] of [[26, 52], [24, 36], [16, 62], [22, 84], [14, 36]]) {
+      const c = armChain(body, hx, hy, 0)
+      assert.ok(c.ik.jx >= -6.05, `${body.kind}: elbow ${c.ik.jx.toFixed(1)} behind the back for ${hx},${hy}`)
+      const L2 = body.fore * c.k2
+      const a = ((c.ik.bAbs + 90) * Math.PI) / 180
+      const wx = c.ik.jx + L2 * Math.cos(a)
+      const wy = c.ik.jy + L2 * Math.sin(a)
+      assert.ok(Math.hypot(wx - hx, wy - hy) < 0.5, `${body.kind}: wrist misses ${hx},${hy}`)
+    }
+    // вільно опущені руки й розмах рук під час ходи не змінюються
+    const L = body.upper + body.fore
+    for (const [hx, hy] of [[4, L - 5], [-3, L - 12], [19, L - 12], [8, L - 10]]) assert.equal(armChain(body, hx, hy, 0).k2, 1, `${body.kind}: ${hx},${hy}`)
+  }
+})
+
+test('arms: a hand-over grip still lands exactly where the scene expects it', () => {
+  for (const body of [WOMAN, MAN]) {
+    const p = { ...restPose(body), x: 100, y: 20, flip: 1, nA: 1, nw: -90 }
+    // точки передачі предмета перед грудьми (відносно плеча: вперед і трохи вниз)
+    const sx = p.x + body.shN[0]
+    const sy = p.y + body.pelvisY + body.shN[1]
+    for (const [wx, wy] of [[sx + 62, sy + 34], [sx + 45, sy + 55], [sx + 30, sy + 62]]) {
+      const t = targetForGrip(p, body, 'n', wx, wy, -90)
+      const [gx, gy] = gripWorld({ ...p, nhx: t.hx, nhy: t.hy }, body, 'n')
+      assert.ok(Math.hypot(gx - wx, gy - wy) < 0.6, `${body.kind}: grip ${gx.toFixed(1)},${gy.toFixed(1)} != ${wx},${wy}`)
+    }
+  }
 })

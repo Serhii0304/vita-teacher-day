@@ -1,5 +1,5 @@
-import { useMemo, useRef } from 'react'
-import { Motes, type MotesHandle } from '../art/common'
+import { useCallback, useMemo, useRef } from 'react'
+import { MoteLayer, type MoteLayerHandle } from '../art/particles'
 import { ArmchairFront } from '../art/furniture'
 import { HER, HerRoom, type HerRoomHandle } from '../art/HerRoom'
 import { WOMAN } from '../characters/body'
@@ -9,11 +9,11 @@ import { FACE, HAND, PROP } from '../characters/pose'
 import { targetForGrip } from '../characters/rigMath'
 import { clamp, ease, smoothstep, windowEnv } from '../engine/math'
 import { Actor } from '../stage/actor'
-import { CamTrack, cameraViewBox, rc, setViewBox } from '../stage/camera'
-import type { Layout, RegisterScene } from '../stage/types'
+import { CamTrack, cameraViewBox, rc } from '../stage/camera'
+import { FxLayer, SceneFrame, WorldSvg, type FxHandle, type ViewBox } from '../stage/layers'
+import type { FrameCtx, Layout, RegisterScene, Screen } from '../stage/types'
 import { useTimeline } from '../stage/useTimeline'
 import type { Timeline } from '../story/timeline'
-import { SceneSvg } from './SceneSvg'
 import { pick, ROOM_MATCH, ROOM_WOMAN } from './shared'
 
 /**
@@ -34,13 +34,13 @@ function plan(tl: Timeline, layout: Layout) {
   const holdNotes = {
     propF: PROP.notebooks,
     fHand: HAND.hold,
-    fhx: 22,
-    fhy: 46,
+    fhx: 18,
+    fhy: 48,
     fw: -88,
     fA: 1,
     fFront: 1,
     nHand: HAND.hold,
-    nhx: 30,
+    nhx: 26,
     nhy: 52,
     nw: -60,
     nA: 1,
@@ -78,14 +78,14 @@ function plan(tl: Timeline, layout: Layout) {
   // сідає в крісло (стопи на місці, таз рухається назад і вниз)
   const sit = Math.max(lampOn + 0.9, s6 + 2.2)
   W.to(sit, sit + 0.7, { px: -20, py: 30, lean: 16, turn: 0.4, head: 4 }, ease.inQuad)
-  W.to(sit + 0.7, sit + 1.5, { px: -40, py: 59, lean: -4, nhx: 22, nhy: 78, fhx: 18, fhy: 82, ...FACE.relief }, ease.outCubic)
+  W.to(sit + 0.7, sit + 1.5, { px: -40, py: 59, lean: -4, nhx: 22, nhy: 84, fhx: 16, fhy: 88, ...FACE.relief }, ease.outCubic)
   // бере чашку (до столика трохи нахиляється)
   const reach = Math.max(sit + 1.8, s7 + 0.05)
   const seated = { x: standX, flip: 1, sc: 1, px: -40, py: 59, lean: 10, nw: -90, nA: 1 }
   const cupT = targetForGrip({ ...W.track.base, ...seated, y: ROOM_WOMAN.y }, WOMAN, 'n', HER.cupX, HER.tableTop - 9, -90)
   W.to(reach, reach + 0.9, { lean: 10, nHand: HAND.hold, nhx: cupT.hx, nhy: cupT.hy, nw: -90, nA: 1, lookX: 0.5, lookY: 0.4, head: 5, ...FACE.warm }, ease.inOutCubic)
   W.set(reach + 0.92, { propN: PROP.cup, steam: 1 })
-  W.to(reach + 0.95, reach + 1.9, { lean: -6, nhx: 30, nhy: 54, fFront: 1, fHand: HAND.hold, fhx: 22, fhy: 62, fw: -80, fA: 1, head: 2, lookY: 0.2, lookX: 0.2 }, ease.inOutCubic)
+  W.to(reach + 0.95, reach + 1.9, { lean: -6, nhx: 28, nhy: 54, fFront: 1, fHand: HAND.hold, fhx: 16, fhy: 62, fw: -80, fA: 1, head: 2, lookY: 0.2, lookX: 0.2 }, ease.inOutCubic)
   // заплющує очі — спокій, тепло
   W.to(reach + 2.1, reach + 2.9, { ...FACE.peace, head: -3, lean: -9 })
   // дивиться на листівки-подяки
@@ -117,44 +117,49 @@ export function EveningScene({ layout, register }: { layout: Layout; register: R
   const p = useMemo(() => plan(tl, layout), [tl, layout])
   const woman = useRef<CharacterHandle>(null)
   const room = useRef<HerRoomHandle>(null)
-  const motes = useRef<MotesHandle>(null)
-  const bloom = useRef<SVGRectElement>(null)
-  const cool = useRef<SVGRectElement>(null)
-  const armFront = useRef<SVGGElement>(null)
+  const motes = useRef<MoteLayerHandle>(null)
+  const bloom = useRef<FxHandle>(null)
+  const cool = useRef<FxHandle>(null)
+  const armFront = useRef<FxHandle>(null)
+
+  const view = useCallback((t: number, scr: Screen): ViewBox => cameraViewBox(p.cam.at(t), scr), [p])
+  const update = useCallback(
+    (ctx: FrameCtx) => {
+      const t = ctx.t
+      const lamp = p.lamp(t)
+      room.current?.update({ lamp, night: 0.15 + lamp * 0.1, clock: 0, cup: p.cup(t), notebooks: p.notebooks(t), cards: p.cards(t), vase: false })
+      woman.current?.apply(p.W.pose(t), t)
+      motes.current?.update(t, lamp)
+      armFront.current?.opacity(p.armFront(t))
+      cool.current?.opacity(0.16 * (1 - lamp))
+      bloom.current?.opacity(clamp(p.bloom(t)))
+    },
+    [p],
+  )
 
   return (
-    <SceneSvg
-      id="evening"
-      label="Вечірня кімната: лампа, крісло, чашка чаю"
-      register={register}
-      update={(ctx, svg) => {
-        const t = ctx.t
-        const lamp = p.lamp(t)
-        room.current?.update({ lamp, night: 0.15 + lamp * 0.1, clock: 0, cup: p.cup(t), notebooks: p.notebooks(t), cards: p.cards(t), vase: false })
-        woman.current?.apply(p.W.pose(t), t)
-        motes.current?.update(t, lamp)
-        if (armFront.current) armFront.current.style.opacity = p.armFront(t).toFixed(3)
-        if (cool.current) cool.current.style.opacity = (0.16 * (1 - lamp)).toFixed(3)
-        if (bloom.current) bloom.current.style.opacity = clamp(p.bloom(t)).toFixed(3)
-        setViewBox(svg, cameraViewBox(p.cam.at(t), ctx.screen))
-      }}
-    >
-      <defs>
-        <radialGradient id="ev-bloom" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#fff1cf" stopOpacity="1" />
-          <stop offset="0.5" stopColor="#ffd98f" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#ffc56a" stopOpacity="0" />
-        </radialGradient>
-      </defs>
+    <SceneFrame id="evening" label="Вечірня кімната: лампа, крісло, чашка чаю" register={register} view={view} update={update}>
       <HerRoom id="ev" ref={room} />
-      <Motes ref={motes} count={18} area={{ x: 40, y: -520, w: 460, h: 520 }} seed={7} color="#ffdca0" size={2.4} />
-      <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_HOME} seed={2} shadow={0.25} />
-      <g ref={armFront} opacity={0}>
+      <MoteLayer ref={motes} count={18} area={{ x: 40, y: -520, w: 460, h: 520 }} seed={7} color="#ffdca0" size={2.4} />
+      <WorldSvg layer>
+        <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_HOME} seed={2} shadow={0.25} />
+      </WorldSvg>
+      {/* передній підлокітник крісла з’являється, коли героїня сідає */}
+      <FxLayer ref={armFront} bounds={{ x: HER.chairX - 80, y: HER.chairY - 130, w: 200, h: 140 }} initialOpacity={0}>
         <ArmchairFront x={HER.chairX} y={HER.chairY} s={HER.chairS} />
-      </g>
-      <rect ref={cool} x={-2400} y={-1800} width={5200} height={3200} fill="#33405e" opacity={0.16} />
+      </FxLayer>
+      <FxLayer ref={cool} bounds={{ x: -2400, y: -1800, w: 5200, h: 3200 }} initialOpacity={0.16} fill="#33405e" />
       {/* світло лампи розливається — перехід до святкового приспіву */}
-      <rect ref={bloom} x={HER.lampX - 2600} y={-2400} width={5200} height={4600} fill="url(#ev-bloom)" opacity={0} />
-    </SceneSvg>
+      <FxLayer ref={bloom} bounds={{ x: HER.lampX - 2600, y: -2400, w: 5200, h: 4600 }} initialOpacity={0}>
+        <defs>
+          <radialGradient id="ev-bloom" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor="#fff1cf" stopOpacity="1" />
+            <stop offset="0.5" stopColor="#ffd98f" stopOpacity="0.85" />
+            <stop offset="1" stopColor="#ffc56a" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <rect x={HER.lampX - 2600} y={-2400} width={5200} height={4600} fill="url(#ev-bloom)" />
+      </FxLayer>
+    </SceneFrame>
   )
 }

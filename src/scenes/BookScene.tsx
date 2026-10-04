@@ -1,13 +1,15 @@
-import { useMemo, useRef } from 'react'
-import { Leaf, LeafField, Motes, type LeafFieldHandle, type MotesHandle } from '../art/common'
+import { useCallback, useMemo, useRef } from 'react'
+import { Leaf, type LeafFieldHandle } from '../art/common'
+import { LeafLayer, MoteLayer, type MoteLayerHandle } from '../art/particles'
 import { DayView, RoomWindow } from '../art/room'
 import { SITE } from '../config/site'
 import { clamp, ease, lerp, smoothstep } from '../engine/math'
-import { CamTrack, cameraViewBox, rc, setViewBox } from '../stage/camera'
-import type { Layout, RegisterScene } from '../stage/types'
+import { CamTrack, cameraViewBox, rc } from '../stage/camera'
+import { FxLayer, SceneFrame, WorldSvg, type FxHandle, type ViewBox } from '../stage/layers'
+import { setDisplay, setOpacity, setSvgAttribute as attr } from '../stage/svgAttributes'
+import type { FrameCtx, Layout, RegisterScene, Screen } from '../stage/types'
 import { useTimeline } from '../stage/useTimeline'
 import type { Timeline } from '../story/timeline'
-import { SceneSvg } from './SceneSvg'
 import { pick, ROOM_WINDOW } from './shared'
 
 /**
@@ -19,6 +21,11 @@ const BH = 440 // висота сторінки
 // намальоване вікно на правій сторінці (масштаб k від справжнього вікна класу)
 const K = 0.44
 const PW = { cx: BW / 2, cy: -BH / 2 + 205, w: ROOM_WINDOW.w * K, h: ROOM_WINDOW.h * K }
+// перенесення координат «справжнього» вікна класу на мініатюру на сторінці
+const PAGE_TX = PW.cx - (ROOM_WINDOW.x + ROOM_WINDOW.w / 2) * K
+const PAGE_TY = PW.cy - (ROOM_WINDOW.y + ROOM_WINDOW.h / 2) * K
+const PAGE_TR = `translate(${PAGE_TX} ${PAGE_TY}) scale(${K})`
+const pageBox = (x: number, y: number, w: number, h: number) => ({ x: PAGE_TX + x * K, y: PAGE_TY + y * K, w: w * K, h: h * K })
 
 function plan(tl: Timeline, layout: Layout) {
   const v1 = tl.s('v1-1')
@@ -46,20 +53,33 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
   const coverIn = useRef<SVGGElement>(null)
   const title = useRef<SVGGElement>(null)
   const veil = useRef<SVGRectElement>(null)
-  const sun = useRef<SVGGElement>(null)
+  const sun = useRef<FxHandle>(null)
   const leaves = useRef<LeafFieldHandle>(null)
   const pageLeaves = useRef<LeafFieldHandle>(null)
-  const motes = useRef<MotesHandle>(null)
+  const motes = useRef<MoteLayerHandle>(null)
   const steam1 = useRef<SVGPathElement>(null)
   const steam2 = useRef<SVGPathElement>(null)
   const shadow = useRef<SVGRectElement>(null)
 
-  return (
-    <SceneSvg
-      id="book"
-      label="Альбом на столі відкривається"
-      register={register}
-      update={(ctx, svg) => {
+  // кадр камери: окрема функція — шар сцени растеризується один раз, а камера рухає готовий растр
+  const view = useCallback(
+    (t: number, scr: Screen): ViewBox => {
+      let vb = cameraViewBox(p.cam.at(t), scr)
+      if (scr.layout === 'tall') {
+        // на вузькому екрані до старту альбом лежить нижче, під текстом привітання
+        const H = scr.h
+        const Wd = scr.w
+        const s0 = Math.min(H * 0.27, ((Wd * 0.62) / BW) * BH) / BH
+        const intro: ViewBox = [BW / 2 - Wd / 2 / s0, -(H * 0.77) / s0, Wd / s0, H / s0]
+        const k = ease.inOutCubic(clamp((t - 0.3) / 3.0))
+        vb = intro.map((v, i) => lerp(v, vb[i], k)) as ViewBox
+      }
+      return vb
+    },
+    [p],
+  )
+  const update = useCallback(
+    (ctx: FrameCtx) => {
         const t = ctx.t
         const o = p.cover(t)
         // обкладинка: вільний край рухається від x=BW до x=-BW, з легкою перспективою
@@ -67,49 +87,34 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         const lift = 26 * Math.sin(o * Math.PI)
         const y0 = -BH / 2
         const y1 = BH / 2
-        if (cover.current) {
-          cover.current.setAttribute('d', `M0 ${y0} L${xe.toFixed(1)} ${(y0 - lift).toFixed(1)} L${xe.toFixed(1)} ${(y1 + lift * 0.6).toFixed(1)} L0 ${y1} Z`)
-          cover.current.setAttribute('fill', xe >= 0 ? '#2f5b5d' : '#f3ead9')
-        }
-        if (shadow.current) {
-          const left = Math.min(0, xe)
-          shadow.current.setAttribute('x', (left - 14).toFixed(1))
-          shadow.current.setAttribute('width', (BW - left + 28).toFixed(1))
-        }
-        if (coverOut.current) {
-          coverOut.current.style.display = xe > 2 ? '' : 'none'
-          coverOut.current.setAttribute('transform', `scale(${(xe / BW).toFixed(3)} 1)`)
-        }
-        if (coverIn.current) {
-          coverIn.current.style.display = xe < -2 ? '' : 'none'
-          coverIn.current.setAttribute('transform', `scale(${(-xe / BW).toFixed(3)} 1)`)
-        }
-        if (title.current) {
-          const a = p.title(t)
-          title.current.style.opacity = a.toFixed(3)
-          title.current.setAttribute('transform', `translate(${(-BW / 2).toFixed(1)} ${(-40 + (1 - a) * 10).toFixed(1)})`)
-        }
-        if (veil.current) veil.current.style.opacity = (0.32 * p.paperVeil(t)).toFixed(3)
-        if (sun.current) sun.current.style.opacity = p.glow(t).toFixed(3)
+        // пишемо в DOM лише змінені значення: після відкриття альбом нерухомий і не перемальовується
+        attr(cover.current, 'd', `M0 ${y0} L${xe.toFixed(1)} ${(y0 - lift).toFixed(1)} L${xe.toFixed(1)} ${(y1 + lift * 0.6).toFixed(1)} L0 ${y1} Z`)
+        attr(cover.current, 'fill', xe >= 0 ? '#2f5b5d' : '#f3ead9')
+        const left = Math.min(0, xe)
+        attr(shadow.current, 'x', (left - 14).toFixed(1))
+        attr(shadow.current, 'width', (BW - left + 28).toFixed(1))
+        setDisplay(coverOut.current, xe > 2)
+        attr(coverOut.current, 'transform', `scale(${(xe / BW).toFixed(3)} 1)`)
+        setDisplay(coverIn.current, xe < -2)
+        attr(coverIn.current, 'transform', `scale(${(-xe / BW).toFixed(3)} 1)`)
+        const a = p.title(t)
+        setOpacity(title.current, a)
+        attr(title.current, 'transform', `translate(${(-BW / 2).toFixed(1)} ${(-40 + (1 - a) * 10).toFixed(2)})`)
+        setOpacity(veil.current, 0.32 * p.paperVeil(t))
+        sun.current?.opacity(p.glow(t))
         leaves.current?.update(t * 0.6, 1, 0.6)
         pageLeaves.current?.update(t, 1, 0.3)
         motes.current?.update(t, 0.8)
         const ph = t * 1.2
         steam1.current?.setAttribute('d', `M560 -170 c${(-10 + Math.sin(ph) * 6).toFixed(1)} -20 ${(12 + Math.sin(ph + 1) * 6).toFixed(1)} -36 ${(Math.sin(ph * 0.8) * 5).toFixed(1)} -60`)
         steam2.current?.setAttribute('d', `M584 -168 c${(-10 + Math.sin(ph + 2) * 6).toFixed(1)} -20 ${(12 + Math.sin(ph + 3) * 6).toFixed(1)} -36 ${(Math.sin(ph * 0.7 + 1) * 5).toFixed(1)} -60`)
-        let vb = cameraViewBox(p.cam.at(t), ctx.screen)
-        if (ctx.screen.layout === 'tall') {
-          // на вузькому екрані до старту альбом лежить нижче, під текстом привітання
-          const H = ctx.screen.h
-          const Wd = ctx.screen.w
-          const s0 = Math.min(H * 0.27, ((Wd * 0.62) / BW) * BH) / BH
-          const intro: [number, number, number, number] = [BW / 2 - Wd / 2 / s0, -(H * 0.77) / s0, Wd / s0, H / s0]
-          const k = ease.inOutCubic(clamp((t - 0.3) / 3.0))
-          vb = intro.map((v, i) => lerp(v, vb[i], k)) as [number, number, number, number]
-        }
-        setViewBox(svg, vb)
-      }}
-    >
+          },
+    [p],
+  )
+
+  return (
+    <SceneFrame id="book" label="Альбом на столі відкривається" register={register} view={view} update={update}>
+      <WorldSvg>
       <defs>
         <linearGradient id="bk-wood" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#9a6a43" />
@@ -149,14 +154,16 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
           <line key={i} x1={-3000} x2={3000} y1={-1650 + i * 330} y2={-1650 + i * 330} />
         ))}
       </g>
-      {/* тіні від рами вікна і тепла пляма сонця */}
-      <g ref={sun}>
+      </WorldSvg>
+      {/* тіні від рами вікна і тепла пляма сонця — окремий шар: розгоряється лише CSS-прозорістю */}
+      <FxLayer ref={sun} bounds={{ x: -1700, y: -1300, w: 3400, h: 2600 }} initialOpacity={0.55}>
         <rect x={-3000} y={-2400} width={6000} height={4800} fill="url(#bk-sun)" />
         <g fill="#2a170d" opacity={0.12}>
           <path d="M-1400 -900 L-1250 -900 L200 900 L50 900 Z" />
           <path d="M-700 -900 L-610 -900 L840 900 L750 900 Z" />
         </g>
-      </g>
+      </FxLayer>
+      <WorldSvg>
 
       {/* калина і листя на столі */}
       <g transform="translate(-520 -150) rotate(-18)">
@@ -228,12 +235,31 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         <rect x={0} y={-BH / 2} width={BW} height={BH} fill="url(#bk-page)" />
         <g>
           <rect x={PW.cx - PW.w / 2 - 18} y={PW.cy - PW.h / 2 - 18} width={PW.w + 36} height={PW.h + 46} fill="#efe5d3" />
-          <g transform={`translate(${PW.cx - (ROOM_WINDOW.x + ROOM_WINDOW.w / 2) * K} ${PW.cy - (ROOM_WINDOW.y + ROOM_WINDOW.h / 2) * K}) scale(${K})`}>
+          <g transform={PAGE_TR}>
             <rect x={ROOM_WINDOW.x - 200} y={ROOM_WINDOW.y - 160} width={ROOM_WINDOW.w + 400} height={ROOM_WINDOW.h + 330} fill="#e9dcc4" />
-            <RoomWindow id="bk-win" x={ROOM_WINDOW.x} y={ROOM_WINDOW.y} w={ROOM_WINDOW.w} h={ROOM_WINDOW.h}>
+            <RoomWindow id="bk-win" part="view" x={ROOM_WINDOW.x} y={ROOM_WINDOW.y} w={ROOM_WINDOW.w} h={ROOM_WINDOW.h}>
               <DayView x={ROOM_WINDOW.x} y={ROOM_WINDOW.y} w={ROOM_WINDOW.w} h={ROOM_WINDOW.h} />
-              <LeafField ref={pageLeaves} count={14} area={{ x: ROOM_WINDOW.x - 20, y: ROOM_WINDOW.y, w: ROOM_WINDOW.w + 40, h: ROOM_WINDOW.h }} seed={4} scale={1.25} speed={0.9} />
             </RoomWindow>
+          </g>
+        </g>
+      </g>
+      </WorldSvg>
+      {/* листопад у намальованому вікні сторінки — окремий шар */}
+      <LeafLayer
+        ref={pageLeaves}
+        count={14}
+        area={pageBox(ROOM_WINDOW.x - 20, ROOM_WINDOW.y, ROOM_WINDOW.w + 40, ROOM_WINDOW.h)}
+        clip={pageBox(ROOM_WINDOW.x + 16, ROOM_WINDOW.y + 16, ROOM_WINDOW.w - 32, ROOM_WINDOW.h - 32)}
+        seed={4}
+        scale={1.25 * K}
+        speed={0.9 * K}
+        unit={K}
+      />
+      <WorldSvg>
+      <g>
+        <g>
+          <g transform={PAGE_TR}>
+            <RoomWindow id="bk-win" part="frame" x={ROOM_WINDOW.x} y={ROOM_WINDOW.y} w={ROOM_WINDOW.w} h={ROOM_WINDOW.h} />
           </g>
           <rect ref={veil} x={PW.cx - PW.w / 2 - 18} y={PW.cy - PW.h / 2 - 18} width={PW.w + 36} height={PW.h + 46} fill="#f6eedf" opacity={0.32} />
           <text x={PW.cx} y={PW.cy + PW.h / 2 + 64} textAnchor="middle" fontFamily="'Marck Script', cursive" fontSize={22} fill="#8a6a4e" opacity={0.85}>
@@ -272,9 +298,10 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         </g>
       </g>
 
-      <Motes ref={motes} count={22} area={{ x: -900, y: -600, w: 1700, h: 1100 }} seed={11} size={3.2} />
-      <LeafField ref={leaves} count={7} area={{ x: -1100, y: -900, w: 2200, h: 1700 }} seed={21} scale={3.2} speed={0.55} />
-    </SceneSvg>
+      </WorldSvg>
+      <MoteLayer ref={motes} count={22} area={{ x: -900, y: -600, w: 1700, h: 1100 }} seed={11} size={3.2} />
+      <LeafLayer ref={leaves} count={7} area={{ x: -1100, y: -900, w: 2200, h: 1700 }} seed={21} scale={3.2} speed={0.55} />
+    </SceneFrame>
   )
 }
 

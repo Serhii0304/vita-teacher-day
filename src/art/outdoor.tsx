@@ -172,7 +172,24 @@ export function TableCup({ x, y, color = '#c46b45', steamRef }: { x: number; y: 
 }
 
 /** Гірлянда теплих лампочок; glowRef — сяйво (вмикається). */
-export function StringLights({ x0, x1, y, sag = 60, n = 14, glowRef }: { x0: number; x1: number; y: number; sag?: number; n?: number; glowRef?: (el: SVGGElement | null) => void }) {
+export function StringLights({
+  x0,
+  x1,
+  y,
+  sag = 60,
+  n = 14,
+  glowRef,
+  part = 'all',
+}: {
+  x0: number
+  x1: number
+  y: number
+  sag?: number
+  n?: number
+  glowRef?: (el: SVGGElement | null) => void
+  /** 'base' — дріт і лампочки; 'glow' — лише сяйво (окремим шаром сцени). */
+  part?: 'all' | 'base' | 'glow'
+}) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const pts = Array.from({ length: n }, (_, i) => {
     const u = (i + 0.5) / n
@@ -182,46 +199,72 @@ export function StringLights({ x0, x1, y, sag = 60, n = 14, glowRef }: { x0: num
   })
   return (
     <g>
-      <defs>
-        <radialGradient id={`bulb-glow-${uid}`}>
-          <stop offset="0" stopColor="#ffe2a0" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#ffcf70" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <path d={`M${x0} ${y} Q${(x0 + x1) / 2} ${y + sag * 2} ${x1} ${y}`} stroke="#3e3a36" strokeWidth={2} fill="none" />
-      <g ref={glowRef} opacity={0}>
-        {pts.map(([x, yy], i) => (
-          <circle key={i} cx={x} cy={yy + 8} r={26} fill={`url(#bulb-glow-${uid})`} />
-        ))}
-      </g>
-      {pts.map(([x, yy], i) => (
-        <g key={i}>
-          <rect x={x - 2} y={yy - 2} width={4} height={6} fill="#4a4540" />
-          <ellipse cx={x} cy={yy + 9} rx={5} ry={6.5} fill="#ffe6b0" />
+      {part !== 'base' && (
+        <defs>
+          <radialGradient id={`bulb-glow-${uid}`}>
+            <stop offset="0" stopColor="#ffe2a0" stopOpacity="0.95" />
+            <stop offset="1" stopColor="#ffcf70" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+      )}
+      {part !== 'glow' && <path d={`M${x0} ${y} Q${(x0 + x1) / 2} ${y + sag * 2} ${x1} ${y}`} stroke="#3e3a36" strokeWidth={2} fill="none" />}
+      {part !== 'base' && (
+        <g ref={glowRef} opacity={part === 'glow' ? undefined : 0}>
+          {pts.map(([x, yy], i) => (
+            <circle key={i} cx={x} cy={yy + 8} r={26} fill={`url(#bulb-glow-${uid})`} />
+          ))}
         </g>
-      ))}
+      )}
+      {part !== 'glow' &&
+        pts.map(([x, yy], i) => (
+          <g key={i}>
+            <rect x={x - 2} y={yy - 2} width={4} height={6} fill="#4a4540" />
+            <ellipse cx={x} cy={yy + 9} rx={5} ry={6.5} fill="#ffe6b0" />
+          </g>
+        ))}
     </g>
   )
 }
 
 /** Вуличний ліхтар (для вечірньої вулиці). */
-export function StreetLamp({ x, y, s = 1, glowRef }: { x: number; y: number; s?: number; glowRef?: (el: SVGGElement | null) => void }) {
+export function StreetLamp({
+  x,
+  y,
+  s = 1,
+  glowRef,
+  part = 'all',
+}: {
+  x: number
+  y: number
+  s?: number
+  glowRef?: (el: SVGGElement | null) => void
+  /** 'lamp' — ліхтар без сяйва; 'glow' — лише сяйво (окремим шаром сцени). */
+  part?: 'all' | 'lamp' | 'glow'
+}) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`}>
-      <defs>
-        <radialGradient id={`slamp-glow-${uid}`}>
-          <stop offset="0" stopColor="#ffd88a" stopOpacity="0.8" />
-          <stop offset="1" stopColor="#ffd88a" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <g ref={glowRef}>
-        <circle cx={0} cy={-300} r={150} fill={`url(#slamp-glow-${uid})`} />
-      </g>
-      <path d="M-5 0 V-290 M5 0 V-290" stroke="#2f3236" strokeWidth={6} />
-      <path d="M-20 -290 h40 l-8 -40 h-24 Z" fill="#2f3236" />
-      <path d="M-14 -296 h28 l-6 -28 h-16 Z" fill="#ffe2a0" />
-      <path d="M-26 0 h52 l-8 -18 h-36 Z" fill="#2f3236" />
+      {part !== 'lamp' && (
+        <>
+          <defs>
+            <radialGradient id={`slamp-glow-${uid}`}>
+              <stop offset="0" stopColor="#ffd88a" stopOpacity="0.8" />
+              <stop offset="1" stopColor="#ffd88a" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <g ref={glowRef}>
+            <circle cx={0} cy={-300} r={150} fill={`url(#slamp-glow-${uid})`} />
+          </g>
+        </>
+      )}
+      {part !== 'glow' && (
+        <>
+          <path d="M-5 0 V-290 M5 0 V-290" stroke="#2f3236" strokeWidth={6} />
+          <path d="M-20 -290 h40 l-8 -40 h-24 Z" fill="#2f3236" />
+          <path d="M-14 -296 h28 l-6 -28 h-16 Z" fill="#ffe2a0" />
+          <path d="M-26 0 h52 l-8 -18 h-36 Z" fill="#2f3236" />
+        </>
+      )}
     </g>
   )
 }

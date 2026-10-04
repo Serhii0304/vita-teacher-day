@@ -19,7 +19,9 @@ export function RoomWindow({
   rows = 3,
   children,
   glassRef,
+  part = 'all',
 }: {
+  part?: 'all' | 'view' | 'frame'
   id: string
   x: number
   y: number
@@ -43,42 +45,53 @@ export function RoomWindow({
   const panes: ReactNode[] = []
   for (let c = 0; c < cols; c++)
     for (let r = 0; r < rows; r++) panes.push(<rect key={`${c}-${r}`} x={ix + c * (cw + mull)} y={iy + r * (chh + mull)} width={cw} height={chh} />)
+  // part: 'view' — лише вид за склом; 'frame' — скло, рама й підвіконня. Так між ними можна вставити
+  // окремий шар листопаду (рама лишається поверх листя, як і раніше).
   return (
     <g>
-      <defs>
-        <clipPath id={`${id}-clip`}>{panes}</clipPath>
-        <linearGradient id={`${id}-glass`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.16" />
-          <stop offset="0.5" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity="0.08" />
-        </linearGradient>
-      </defs>
-      {/* відкіс */}
-      <rect x={x - 14} y={y - 14} width={w + 28} height={h + 22} fill="#000" opacity={0.08} rx={6} />
-      <g clipPath={`url(#${id}-clip)`}>
-        {children}
-        <g ref={glassRef}>
-          <rect x={ix} y={iy} width={iw} height={ih} fill={`url(#${id}-glass)`} />
-        </g>
-      </g>
-      {/* рама */}
-      <path
-        d={`M${x} ${y}h${w}v${h}h${-w}Z M${ix} ${iy}v${ih}h${iw}v${-ih}Z`}
-        fill={frame}
-        fillRule="evenodd"
-      />
-      {Array.from({ length: cols - 1 }, (_, i) => (
-        <rect key={`v${i}`} x={ix + (i + 1) * cw + i * mull} y={iy} width={mull} height={ih} fill={frame} />
-      ))}
-      {Array.from({ length: rows - 1 }, (_, i) => (
-        <rect key={`h${i}`} x={ix} y={iy + (i + 1) * chh + i * mull} width={iw} height={mull} fill={frame} />
-      ))}
-      <rect x={x} y={y + h - 4} width={w} height={4} fill={frameShade} />
-      {/* підвіконня */}
-      <path d={`M${x - 30} ${y + h} h${w + 60} l-12 18 h${-w - 36} Z`} fill={frame} />
-      <path d={`M${x - 18} ${y + h + 18} h${w + 36} v6 h${-w - 36} Z`} fill={frameShade} />
+      {part !== 'frame' && (
+        <>
+          <defs>
+            <clipPath id={`${id}-clip`}>{panes}</clipPath>
+            <linearGradient id={`${id}-glass`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#ffffff" stopOpacity="0.16" />
+              <stop offset="0.5" stopColor="#ffffff" stopOpacity="0" />
+              <stop offset="1" stopColor="#ffffff" stopOpacity="0.08" />
+            </linearGradient>
+          </defs>
+          {/* відкіс */}
+          <rect x={x - 14} y={y - 14} width={w + 28} height={h + 22} fill="#000" opacity={0.08} rx={6} />
+          <g clipPath={`url(#${id}-clip)`}>{children}</g>
+        </>
+      )}
+      {part !== 'view' && (
+        <>
+          <g clipPath={`url(#${id}-clip)`}>
+            <g ref={glassRef}>
+              <rect x={ix} y={iy} width={iw} height={ih} fill={`url(#${id}-glass)`} />
+            </g>
+          </g>
+          {/* рама */}
+          <path d={`M${x} ${y}h${w}v${h}h${-w}Z M${ix} ${iy}v${ih}h${iw}v${-ih}Z`} fill={frame} fillRule="evenodd" />
+          {Array.from({ length: cols - 1 }, (_, i) => (
+            <rect key={`v${i}`} x={ix + (i + 1) * cw + i * mull} y={iy} width={mull} height={ih} fill={frame} />
+          ))}
+          {Array.from({ length: rows - 1 }, (_, i) => (
+            <rect key={`h${i}`} x={ix} y={iy + (i + 1) * chh + i * mull} width={iw} height={mull} fill={frame} />
+          ))}
+          <rect x={x} y={y + h - 4} width={w} height={4} fill={frameShade} />
+          {/* підвіконня */}
+          <path d={`M${x - 30} ${y + h} h${w + 60} l-12 18 h${-w - 36} Z`} fill={frame} />
+          <path d={`M${x - 18} ${y + h + 18} h${w + 36} v6 h${-w - 36} Z`} fill={frameShade} />
+        </>
+      )}
     </g>
   )
+}
+
+/** Внутрішній прямокутник шибок вікна (для обрізання шару листопаду). */
+export function windowPanes(x: number, y: number, w: number, h: number) {
+  return { x: x + 16, y: y + 16, w: w - 32, h: h - 32 }
 }
 
 /** Вид за вікном удень: тепле небо, осіннє дерево, далекий шкільний двір. */
@@ -393,11 +406,11 @@ export function SideTable({ x, y, s = 1 }: { x: number; y: number; s?: number })
   )
 }
 
-/** Настільна лампа; glowRef — сяйво (вмикається анімацією), shadeRef — абажур (світлішає). */
-export function TableLamp({ x, y, s = 1, glowRef, shadeRef }: { x: number; y: number; s?: number; glowRef?: Ref<SVGGElement>; shadeRef?: Ref<SVGPathElement> }) {
+/** Сяйво настільної лампи (у системі координат лампи: центр абажура над точкою (0, −110)). */
+export function LampGlow() {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   return (
-    <g transform={`translate(${x} ${y}) scale(${s})`}>
+    <>
       <defs>
         <radialGradient id={`lamp-glow-${uid}`}>
           <stop offset="0" stopColor="#ffd98f" stopOpacity="0.95" />
@@ -405,9 +418,35 @@ export function TableLamp({ x, y, s = 1, glowRef, shadeRef }: { x: number; y: nu
           <stop offset="1" stopColor="#ffb44f" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <g ref={glowRef} opacity={0}>
-        <ellipse cx={0} cy={-110} rx={420} ry={340} fill={`url(#lamp-glow-${uid})`} />
-      </g>
+      <ellipse cx={0} cy={-110} rx={420} ry={340} fill={`url(#lamp-glow-${uid})`} />
+    </>
+  )
+}
+
+/** Настільна лампа; glowRef — сяйво (вмикається анімацією), shadeRef — абажур (світлішає). */
+export function TableLamp({
+  x,
+  y,
+  s = 1,
+  glowRef,
+  shadeRef,
+  glow = true,
+}: {
+  x: number
+  y: number
+  s?: number
+  glowRef?: Ref<SVGGElement>
+  shadeRef?: Ref<SVGPathElement>
+  /** false — сяйво малює сцена окремим шаром (LampGlow). */
+  glow?: boolean
+}) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${s})`}>
+      {glow && (
+        <g ref={glowRef} opacity={0}>
+          <LampGlow />
+        </g>
+      )}
       <path d="M-22 0 C-24 -12 -12 -16 0 -16 C12 -16 24 -12 22 0 Z" fill="#c9a77a" />
       <rect x={-4} y={-80} width={8} height={66} fill="#b08a5c" />
       <path ref={shadeRef} d="M-40 -82 L-26 -138 H26 L40 -82 Z" fill="#e9d4ac" />

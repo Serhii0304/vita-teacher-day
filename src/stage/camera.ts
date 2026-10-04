@@ -1,7 +1,6 @@
 import { ease as E, lerp, type Ease } from '../engine/math'
 import { Track } from '../engine/moves'
 import type { Rect, Screen } from './types'
-import { setSvgAttribute } from './svgAttributes'
 
 /** Траєкторія камери як функція часу (кадр задається прямокутником-фокусом). */
 export class CamTrack {
@@ -38,11 +37,6 @@ export function cameraViewBox(focus: Rect, scr: Screen): [number, number, number
   const x = focus.x + focus.w / 2 - vw / 2
   const y = focus.y + focus.h / 2 - (scr.reservedTop + availH / 2) / s
   return [x, y, vw, vh]
-}
-
-export function setViewBox(el: SVGSVGElement | null, vb: [number, number, number, number]) {
-  if (!el) return
-  setSvgAttribute(el, 'viewBox', vb.map((v) => Math.round(v * 10) / 10).join(' '))
 }
 
 export const lerpRect = (a: Rect, b: Rect, p: number): Rect => ({

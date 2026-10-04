@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
+import { memo, startTransition, useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
 import { sceneSchedule, sceneVisibility } from '../story/SceneTimeline'
 import { sceneMounts } from './sceneMounts'
 import type { FrameBus } from './frameBus'
@@ -12,17 +12,37 @@ export interface SceneEntry {
 /**
  * Монтує поточну сцену, обидві сторони переходу та завчасно наступну.
  * Завершені сцени звільняють DOM; перемотування відновлює їх з часу аудіо.
+ *
+ * Наступна сцена готується у фоні (startTransition): React будує її DOM невеликими порціями
+ * між кадрами, тож анімація не завмирає. Раніше це був один блок ~200 мс (на телефоні — до секунди).
+ * Сцени, які вже мають бути видимі (наприклад, після перемотування), монтуються одразу.
  */
 export const StoryStage = memo(function StoryStage({ scenes, bus, layout }: { scenes: SceneEntry[]; bus: FrameBus; layout: Layout }) {
   const runtimes = useRef(new Map<SceneId, SceneRuntime>())
   const [mounted, setMounted] = useState<SceneId[]>([scenes[0].id])
-  const mountedKey = useRef(mounted.join('|'))
+  // що вже змонтовано (після коміту) і що востаннє запитано
+  const committed = useRef<SceneId[]>(mounted)
+  const requested = useRef(mounted.join('|'))
+  const urgentKey = useRef('')
+  useEffect(() => {
+    committed.current = mounted
+  }, [mounted])
+
+  const prepared = useRef(new WeakSet<SceneRuntime>())
   const draw = (rt: SceneRuntime, vis: number, ctx: FrameCtx) => {
     if (!rt.el) return
     if (vis <= 0.001) {
-      if (rt.el.style.display !== 'none') rt.el.style.display = 'none'
+      // сцена ще не з’явилась (або вже зникла): стоїть у розкладці невидимою; спершу один раз
+      // розставляємо її на поточний час, далі щокадру вмикаємо по одному важкому шару
+      if (rt.el.style.opacity !== '0') rt.el.style.opacity = '0'
+      if (!prepared.current.has(rt)) {
+        prepared.current.add(rt)
+        if (rt.el.style.display !== '') rt.el.style.display = ''
+        rt.update(ctx)
+      } else rt.warm?.()
       return
     }
+    rt.reveal?.()
     if (rt.el.style.display !== '') rt.el.style.display = ''
     const opacity = vis >= 0.999 ? '1' : vis.toFixed(3)
     if (rt.el.style.opacity !== opacity) rt.el.style.opacity = opacity
@@ -45,9 +65,15 @@ export const StoryStage = memo(function StoryStage({ scenes, bus, layout }: { sc
       const sched = sceneSchedule(ctx.tl)
       const needed = sceneMounts(sched, ctx.tReal)
       const key = needed.join('|')
-      if (key !== mountedKey.current) {
-        mountedKey.current = key
+      // видима зараз сцена, якої ще немає в DOM, — монтуємо негайно
+      const missing = sched.some((w, i) => needed.includes(w.id) && !committed.current.includes(w.id) && sceneVisibility(sched, i, ctx.tReal) > 0)
+      if (missing && urgentKey.current !== key) {
+        urgentKey.current = key
+        requested.current = key
         setMounted(needed)
+      } else if (key !== requested.current) {
+        requested.current = key
+        startTransition(() => setMounted(needed))
       }
       sched.forEach((w, i) => {
         const rt = runtimes.current.get(w.id)

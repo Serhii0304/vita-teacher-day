@@ -1,5 +1,6 @@
-import { useMemo, useRef } from 'react'
-import { AutumnTree, Leaf, LeafField, Motes, type LeafFieldHandle, type MotesHandle } from '../art/common'
+import { useCallback, useMemo, useRef } from 'react'
+import { AutumnTree, Leaf, type LeafFieldHandle } from '../art/common'
+import { LeafLayer, MoteLayer, type MoteLayerHandle } from '../art/particles'
 import { Bench, CafeTable, FlowerBush, KalynaBush, StreetLamp, StringLights } from '../art/outdoor'
 import { MAN, WOMAN } from '../characters/body'
 import { Character, type CharacterHandle } from '../characters/Character'
@@ -8,11 +9,12 @@ import { FACE, HAND, PROP } from '../characters/pose'
 import { targetForGrip } from '../characters/rigMath'
 import { clamp, ease, lerp, smoothstep, windowEnv } from '../engine/math'
 import { Actor } from '../stage/actor'
-import { CamTrack, cameraViewBox, rc, setViewBox } from '../stage/camera'
-import type { Layout, RegisterScene } from '../stage/types'
+import { CamTrack, cameraViewBox, rc } from '../stage/camera'
+import { FxLayer, SceneFrame, WorldSvg, type FxHandle, type ViewBox } from '../stage/layers'
+import { setDisplay, setOpacity, setSvgAttribute as attr } from '../stage/svgAttributes'
+import type { FrameCtx, Layout, RegisterScene, Screen } from '../stage/types'
 import { useTimeline } from '../stage/useTimeline'
 import type { Timeline } from '../story/timeline'
-import { SceneSvg } from './SceneSvg'
 
 /**
  * ПРОГРАШ → БРІДЖ → ФІНАЛЬНИЙ ПРИСПІВ → ЗАВЕРШЕННЯ — один безперервний простір: осіння алея і тераса в саду.
@@ -90,17 +92,17 @@ function plan(tl: Timeline, layout: Layout) {
   // сідають на лавку (природна відстань між ними)
   const sitW = wArr + 0.15
   W.to(sitW, sitW + 0.6, { px: -18, py: 30, lean: 14, turn: 0.45 }, ease.inQuad)
-  W.to(sitW + 0.6, sitW + 1.3, { px: -34, py: 64, lean: -2, lFS: 0.6, nfx: 20, ffx: 32, nhx: 24, nhy: 76, fhx: 20, fhy: 80, ...FACE.warm }, ease.outCubic)
+  W.to(sitW + 0.6, sitW + 1.3, { px: -34, py: 64, lean: -2, lFS: 0.6, nfx: 20, ffx: 32, nhx: 22, nhy: 84, fhx: 16, fhy: 88, ...FACE.warm }, ease.outCubic)
   const sitM = mArr + 0.15
   M.to(sitM, sitM + 0.25, { turn: 0.1 })
   M.set(sitM + 0.25, { flip: -1, turn: 0.12, nfx: -6, ffx: 10 })
   M.to(sitM + 0.25, sitM + 0.85, { px: -16, py: 32, lean: 14, turn: 0.5 }, ease.inQuad)
-  M.to(sitM + 0.85, sitM + 1.5, { px: -38, py: 74, lean: -2, lFS: 0.6, nfx: 22, ffx: 34, nhx: 26, nhy: 82, fhx: 22, fhy: 86, ...FACE.warm }, ease.outCubic)
+  M.to(sitM + 0.85, sitM + 1.5, { px: -38, py: 74, lean: -2, lFS: 0.6, nfx: 22, ffx: 34, nhx: 24, nhy: 90, fhx: 18, fhy: 95, ...FACE.warm }, ease.outCubic)
   // «Щоб ділитися і радістю, й журбою» — розмова: радість, мить задумливості, підтримка
   W.to(b3, b3 + 0.4, { talk: 0.6, ...FACE.beam, turn: 0.75, lookX: 0.6 })
   W.to(b3 + 0.3, b3 + 0.9, { fFront: 1, fHand: HAND.open, fhx: 40, fhy: 30, fw: -140, fA: 1 }, ease.inOutCubic)
   M.to(b3 + 0.4, b3 + 1.0, { ...FACE.beam, nod: 0.3, turn: 0.75, lookX: 0.6 })
-  W.to(b3 + 1.8, b3 + 2.3, { talk: 0, fFront: 0, fHand: HAND.relaxed, fhx: 20, fhy: 80, fA: 0, fw: 0, ...FACE.concern, head: 6, lookY: 0.5, eye: 0.85 })
+  W.to(b3 + 1.8, b3 + 2.3, { talk: 0, fFront: 0, fHand: HAND.relaxed, fhx: 16, fhy: 88, fA: 0, fw: 0, ...FACE.concern, head: 6, lookY: 0.5, eye: 0.85 })
   M.to(b3 + 2.0, b3 + 2.4, { nod: 0, ...FACE.listen, browIn: 0.35 })
   M.to(b3 + 2.5, b3 + 3.0, { talk: 0.5, ...FACE.warm })
   W.to(e('b-3') - 0.6, e('b-3') + 0.2, { ...FACE.warm, head: 0, lookY: 0, eye: 1 })
@@ -123,8 +125,8 @@ function plan(tl: Timeline, layout: Layout) {
   W.set(f2 + 1.02, { propN: PROP.cup, steam: 1 })
   M.to(f2 + 0.7, f2 + 1.6, { lean: 0, nhx: 44, nhy: 30, ...FACE.beam, lookY: 0, lookX: 0.7 }, ease.inOutCubic)
   W.to(f2 + 1.1, f2 + 2.0, { lean: 0, nhx: 44, nhy: 30, ...FACE.beam, lookY: 0, lookX: 0.7 }, ease.inOutCubic)
-  W.to(f2 + 2.6, e('f-2'), { nhx: 30, nhy: 50, fFront: 1, fHand: HAND.hold, fhx: 22, fhy: 60, fw: -80, fA: 1, ...FACE.warm })
-  M.to(f2 + 2.7, e('f-2'), { nhx: 30, nhy: 54, fFront: 1, fHand: HAND.hold, fhx: 24, fhy: 64, fw: -80, fA: 1, ...FACE.warm })
+  W.to(f2 + 2.6, e('f-2'), { nhx: 30, nhy: 50, fFront: 1, fHand: HAND.hold, fhx: 16, fhy: 60, fw: -80, fA: 1, ...FACE.warm })
+  M.to(f2 + 2.7, e('f-2'), { nhx: 30, nhy: 54, fFront: 1, fHand: HAND.hold, fhx: 18, fhy: 64, fw: -80, fA: 1, ...FACE.warm })
   // «Хай тобі вертається все віддане тепло» — світло довкола, обличчя до сонця
   W.to(f3 - 0.2, f3 + 1.4, { turn: 0.3, lookX: -0.2, lookY: -0.4, ...FACE.relief, eye: 0.9, smile: 0.8 })
   M.to(f3, f3 + 1.6, { turn: 0.35, lookX: 0.1, lookY: -0.4, smile: 0.8 })
@@ -175,6 +177,8 @@ function plan(tl: Timeline, layout: Layout) {
   }
 }
 
+const SUN_Y0 = -560
+
 export function GardenScene({ layout, register }: { layout: Layout; register: RegisterScene }) {
   const tl = useTimeline()
   const p = useMemo(() => plan(tl, layout), [tl, layout])
@@ -182,187 +186,181 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
   const man = useRef<CharacterHandle>(null)
   const leaves = useRef<LeafFieldHandle>(null)
   const leavesFront = useRef<LeafFieldHandle>(null)
-  const motes = useRef<MotesHandle>(null)
-  const sparkle = useRef<MotesHandle>(null)
-  const sparkleG = useRef<SVGGElement>(null)
-  const bulbs = useRef<SVGGElement | null>(null)
-  const sunset = useRef<SVGRectElement>(null)
-  const sun = useRef<SVGGElement>(null)
-  const dusk = useRef<SVGRectElement>(null)
+  const motes = useRef<MoteLayerHandle>(null)
+  const sparkle = useRef<MoteLayerHandle>(null)
+  const bulbs = useRef<FxHandle>(null)
+  const sunset = useRef<FxHandle>(null)
+  const sun = useRef<FxHandle>(null)
+  const dusk = useRef<FxHandle>(null)
   const steamW = useRef<SVGPathElement>(null)
   const steamM = useRef<SVGPathElement>(null)
   const cupW = useRef<SVGGElement>(null)
   const cupM = useRef<SVGGElement>(null)
-  const lampGlow1 = useRef<SVGGElement | null>(null)
-  const lampGlow2 = useRef<SVGGElement | null>(null)
-  const flowerGlow = useRef<SVGGElement>(null)
-  const rays = useRef<SVGGElement>(null)
-  const wrap = useRef<SVGGElement>(null)
+  const lampGlow = useRef<FxHandle>(null)
+  const flowerGlow = useRef<FxHandle>(null)
+  const rays = useRef<FxHandle>(null)
+  const wrap = useRef<FxHandle>(null)
   const sunX = layout === 'wide' ? 1060 : 860
 
-  return (
-    <SceneSvg
-      id="garden"
-      label="Осінній сад і тераса: зустріч, лавка, дві чашки, золоте світло"
-      register={register}
-      update={(ctx, svg) => {
-        const t = ctx.t
-        woman.current?.apply(p.W.pose(t), t)
-        man.current?.apply(p.M.pose(t), t)
-        const calm = p.calm(t)
-        leaves.current?.update(t * (0.4 + 0.6 * calm), Math.max(0.35, calm), 0.6)
-        leavesFront.current?.update(t * 0.7, calm, 0.6)
-        motes.current?.update(t, 0.7)
-        const lg = p.lights(t)
-        if (bulbs.current) bulbs.current.style.opacity = (lg * (0.85 + 0.15 * Math.sin(t * 2.1))).toFixed(3)
-        const ss = p.sunset(t)
-        if (sunset.current) sunset.current.style.opacity = ss.toFixed(3)
-        if (dusk.current) dusk.current.style.opacity = (ss * 0.6).toFixed(3)
-        if (sun.current) sun.current.setAttribute('transform', `translate(${sunX} ${p.sunY(t).toFixed(1)})`)
-        if (rays.current) {
-          rays.current.setAttribute('transform', `translate(${sunX} ${p.sunY(t).toFixed(1)}) rotate(${(t * 0.8).toFixed(2)})`)
-          rays.current.style.opacity = p.rays(t).toFixed(3)
-        }
-        if (wrap.current) {
-          wrap.current.setAttribute('transform', `translate(${sunX} ${p.sunY(t).toFixed(1)})`)
-          wrap.current.style.opacity = (0.55 * p.rays(t)).toFixed(3)
-        }
-        const gl = p.glow(t)
-        if (sparkleG.current) sparkleG.current.style.opacity = gl.toFixed(3)
-        sparkle.current?.update(t, gl)
-        if (flowerGlow.current) flowerGlow.current.style.opacity = (0.25 + 0.75 * gl).toFixed(3)
-        const lp = p.lamps(t)
-        if (lampGlow1.current) lampGlow1.current.style.opacity = lp.toFixed(3)
-        if (lampGlow2.current) lampGlow2.current.style.opacity = lp.toFixed(3)
-        const [wOn, mOn] = p.cupsOnTable(t)
-        if (cupW.current) cupW.current.style.display = wOn ? '' : 'none'
-        if (cupM.current) cupM.current.style.display = mOn ? '' : 'none'
-        // пара від двох чашок м’яко сплітається
-        const en = p.entwine(t)
-        const ph = t * 0.9
-        const top = -126
-        const midX = (CUP_W.x + CUP_M.x) / 2
-        const sw = (x0: number, side: number, ph2: number) => {
-          const x1 = lerp(x0 + Math.sin(ph2) * 6, midX + side * 6, en)
-          const xTop = lerp(x0 + Math.sin(ph2 + 1.4) * 8, midX - side * 4, en)
-          return `M${x0} ${CUP_W.y - 22} C${(x0 + Math.sin(ph2 + 0.5) * 10).toFixed(1)} ${CUP_W.y - 50} ${x1.toFixed(1)} ${CUP_W.y - 70} ${(lerp(x0, midX, en * 0.6) + Math.sin(ph2 + 2) * 5).toFixed(1)} ${CUP_W.y - 95} S${xTop.toFixed(1)} ${CUP_W.y + top + 20} ${(xTop + Math.sin(ph2 + 3) * 6).toFixed(1)} ${CUP_W.y + top}`
-        }
-        steamW.current?.setAttribute('d', sw(CUP_W.x, -1, ph))
-        steamM.current?.setAttribute('d', sw(CUP_M.x, 1, ph + 2))
-        const steamOp = (0.16 + 0.2 * clamp(en + 0.3)).toFixed(3)
-        if (steamW.current) steamW.current.style.opacity = wOn ? steamOp : '0'
-        if (steamM.current) steamM.current.style.opacity = mOn ? steamOp : '0'
-        setViewBox(svg, cameraViewBox(p.cam.at(t), ctx.screen))
-      }}
-    >
-      <defs>
-        <linearGradient id="gd-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e6a978" />
-          <stop offset="0.5" stopColor="#f3c690" />
-          <stop offset="1" stopColor="#f9dfae" />
-        </linearGradient>
-        <linearGradient id="gd-sunset" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#6d5a7e" />
-          <stop offset="0.45" stopColor="#c27e86" />
-          <stop offset="0.8" stopColor="#f0a77a" />
-          <stop offset="1" stopColor="#f7c98e" />
-        </linearGradient>
-        <radialGradient id="gd-horizon">
-          <stop offset="0" stopColor="#ffd08a" stopOpacity="0.7" />
-          <stop offset="1" stopColor="#ffb878" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="gd-ray" cx="0" cy="0" r="2200" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fff1cf" stopOpacity="0.32" />
-          <stop offset="0.6" stopColor="#fff1cf" stopOpacity="0.06" />
-          <stop offset="1" stopColor="#fff1cf" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="gd-wrap" cx="0" cy="0" r="1500" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#ffd79a" stopOpacity="0.5" />
-          <stop offset="0.5" stopColor="#ffc98a" stopOpacity="0.14" />
-          <stop offset="1" stopColor="#ffc98a" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="gd-sun">
-          <stop offset="0" stopColor="#fff3d4" stopOpacity="1" />
-          <stop offset="0.12" stopColor="#ffe2a2" stopOpacity="0.9" />
-          <stop offset="0.4" stopColor="#ffc879" stopOpacity="0.35" />
-          <stop offset="1" stopColor="#ffb86a" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="gd-grass" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#a39a5a" />
-          <stop offset="1" stopColor="#6f7a48" />
-        </linearGradient>
-        <linearGradient id="gd-path" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e3cfa8" />
-          <stop offset="1" stopColor="#cbb38a" />
-        </linearGradient>
-        <linearGradient id="gd-deck" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#b98a5c" />
-          <stop offset="1" stopColor="#8e6440" />
-        </linearGradient>
-        <linearGradient id="gd-dusk" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3b3060" stopOpacity="0.55" />
-          <stop offset="0.45" stopColor="#3b3060" stopOpacity="0.18" />
-          <stop offset="1" stopColor="#2a2040" stopOpacity="0.22" />
-        </linearGradient>
-        <radialGradient id="gd-flowerglow">
-          <stop offset="0" stopColor="#ffd98f" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#ffd98f" stopOpacity="0" />
-        </radialGradient>
-      </defs>
+  const view = useCallback((t: number, scr: Screen): ViewBox => cameraViewBox(p.cam.at(t), scr), [p])
+  const update = useCallback(
+    (ctx: FrameCtx) => {
+      const t = ctx.t
+      woman.current?.apply(p.W.pose(t), t)
+      man.current?.apply(p.M.pose(t), t)
+      const calm = p.calm(t)
+      leaves.current?.update(t * (0.4 + 0.6 * calm), Math.max(0.35, calm), 0.6)
+      leavesFront.current?.update(t * 0.7, calm, 0.6)
+      motes.current?.update(t, 0.7)
+      // світло — окремі шари: змінюються лише прозорість, зсув і поворот (робота композитора)
+      const lg = p.lights(t)
+      bulbs.current?.opacity(lg * (0.85 + 0.15 * Math.sin(t * 2.1)))
+      const ss = p.sunset(t)
+      sunset.current?.opacity(ss)
+      dusk.current?.opacity(ss * 0.6)
+      const dy = p.sunY(t) - SUN_Y0
+      sun.current?.move(0, dy)
+      const r = p.rays(t)
+      rays.current?.move(0, dy, t * 0.8)
+      rays.current?.opacity(r)
+      wrap.current?.move(0, dy)
+      wrap.current?.opacity(0.55 * r)
+      const gl = p.glow(t)
+      sparkle.current?.update(t, gl * gl)
+      flowerGlow.current?.opacity(0.25 + 0.75 * gl)
+      lampGlow.current?.opacity(p.lamps(t))
+      const [wOn, mOn] = p.cupsOnTable(t)
+      setDisplay(cupW.current, wOn)
+      setDisplay(cupM.current, mOn)
+      // пара від двох чашок м’яко сплітається
+      const en = p.entwine(t)
+      const ph = t * 0.9
+      const top = -126
+      const midX = (CUP_W.x + CUP_M.x) / 2
+      const sw = (x0: number, side: number, ph2: number) => {
+        const x1 = lerp(x0 + Math.sin(ph2) * 6, midX + side * 6, en)
+        const xTop = lerp(x0 + Math.sin(ph2 + 1.4) * 8, midX - side * 4, en)
+        return `M${x0} ${CUP_W.y - 22} C${(x0 + Math.sin(ph2 + 0.5) * 10).toFixed(1)} ${CUP_W.y - 50} ${x1.toFixed(1)} ${CUP_W.y - 70} ${(lerp(x0, midX, en * 0.6) + Math.sin(ph2 + 2) * 5).toFixed(1)} ${CUP_W.y - 95} S${xTop.toFixed(1)} ${CUP_W.y + top + 20} ${(xTop + Math.sin(ph2 + 3) * 6).toFixed(1)} ${CUP_W.y + top}`
+      }
+      const steamOp = 0.16 + 0.2 * clamp(en + 0.3)
+      setOpacity(steamW.current, wOn ? steamOp : 0)
+      setOpacity(steamM.current, mOn ? steamOp : 0)
+      if (wOn) attr(steamW.current, 'd', sw(CUP_W.x, -1, ph))
+      if (mOn) attr(steamM.current, 'd', sw(CUP_M.x, 1, ph + 2))
+    },
+    [p],
+  )
 
-      {/* небо: золоте → захід → сутінки */}
-      <rect x={-5000} y={-4000} width={10000} height={4000} fill="url(#gd-sky)" />
-      <rect ref={sunset} x={-5000} y={-4000} width={10000} height={4000} fill="url(#gd-sunset)" opacity={0} />
+  return (
+    <SceneFrame id="garden" label="Осінній сад і тераса: зустріч, лавка, дві чашки, золоте світло" register={register} view={view} update={update}>
+      <WorldSvg>
+        <defs>
+          <linearGradient id="gd-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e6a978" />
+            <stop offset="0.5" stopColor="#f3c690" />
+            <stop offset="1" stopColor="#f9dfae" />
+          </linearGradient>
+        </defs>
+        {/* небо: золоте → захід → сутінки */}
+        <rect x={-5000} y={-4000} width={10000} height={4000} fill="url(#gd-sky)" />
+      </WorldSvg>
+      <FxLayer ref={sunset} bounds={{ x: -5000, y: -4000, w: 10000, h: 4000 }} initialOpacity={0}>
+        <defs>
+          <linearGradient id="gd-sunset" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#6d5a7e" />
+            <stop offset="0.45" stopColor="#c27e86" />
+            <stop offset="0.8" stopColor="#f0a77a" />
+            <stop offset="1" stopColor="#f7c98e" />
+          </linearGradient>
+        </defs>
+        <rect x={-5000} y={-4000} width={10000} height={4000} fill="url(#gd-sunset)" />
+      </FxLayer>
       {/* сонце, що повільно сідає за пагорби */}
-      <g ref={sun}>
-        <circle cx={0} cy={0} r={900} fill="url(#gd-sun)" />
-        <ellipse cx={0} cy={60} rx={1500} ry={220} fill="url(#gd-horizon)" />
-        <circle cx={0} cy={0} r={58} fill="#fff6e2" opacity={0.96} />
-      </g>
-      <g ref={rays} opacity={0.4}>
-        {Array.from({ length: 9 }, (_, i) => {
-          const a = (i / 9) * Math.PI * 2
-          const a2 = a + 0.07
-          const d = `M0 0 L${(Math.cos(a) * 2200).toFixed(0)} ${(Math.sin(a) * 2200).toFixed(0)} L${(Math.cos(a2) * 2200).toFixed(0)} ${(Math.sin(a2) * 2200).toFixed(0)} Z`
-          return <path key={i} d={d} fill="url(#gd-ray)" />
-        })}
-      </g>
-      {/* пагорби й далекий ліс у серпанку */}
-      <path d="M-5000 -260 C-3000 -360 -1600 -300 -400 -340 C800 -380 1800 -300 5000 -330 V0 H-5000 Z" fill="#d9a87a" opacity={0.55} />
-      <path d="M-5000 -180 C-3400 -240 -1800 -200 -200 -230 C1400 -260 2600 -200 5000 -220 V0 H-5000 Z" fill="#b98a62" opacity={0.6} />
-      {/* дальній ряд дерев алеї */}
-      {[-2700, -2250, -1800, -1350, -900, -450, 1500, 1950].map((x, i) => (
-        <AutumnTree key={x} x={x} y={-40} s={1.9 + (i % 3) * 0.15} seed={40 + i} palette={i % 2 ? ['#e2a640', '#d58a2f', '#eec46a', '#c76b30'] : ['#e8b64e', '#d9952f', '#efc86a', '#c97b2e']} lit="right" />
-      ))}
-      {/* трава, алея, настил тераси */}
-      <rect x={-5000} y={-60} width={10000} height={3000} fill="url(#gd-grass)" />
-      <path d="M-5000 -18 L320 -18 L380 70 L-5000 70 Z" fill="url(#gd-path)" />
-      <rect x={300} y={-34} width={1100} height={150} fill="url(#gd-deck)" />
-      <g stroke="#7a5236" strokeWidth={2} opacity={0.45}>
-        {Array.from({ length: 12 }, (_, i) => (
-          <line key={i} x1={300 + i * 92} y1={-34} x2={300 + i * 92 - 30} y2={116} />
-        ))}
-      </g>
-      <rect x={300} y={-40} width={1100} height={8} fill="#c99a68" />
-      {/* опале листя на землі */}
-      {[
-        [-1800, 30, 0, '#d9822b'],
-        [-1500, 52, 1, '#e2a640'],
-        [-1100, 26, 2, '#c4683a'],
-        [-800, 58, 0, '#e8c46a'],
-        [-300, 40, 3, '#d9822b'],
-        [120, 60, 1, '#c4683a'],
-      ].map(([x, y, k, c], i) => (
-        <g key={i} transform={`translate(${x} ${y}) rotate(${i * 47}) scale(1.6 0.8)`}>
-          <Leaf kind={Number(k)} color={String(c)} vein={false} />
+      <FxLayer ref={sun} bounds={{ x: sunX - 1500, y: SUN_Y0 - 900, w: 3000, h: 1800 }}>
+        <defs>
+          <radialGradient id="gd-sun">
+            <stop offset="0" stopColor="#fff3d4" stopOpacity="1" />
+            <stop offset="0.12" stopColor="#ffe2a2" stopOpacity="0.9" />
+            <stop offset="0.4" stopColor="#ffc879" stopOpacity="0.35" />
+            <stop offset="1" stopColor="#ffb86a" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="gd-horizon">
+            <stop offset="0" stopColor="#ffd08a" stopOpacity="0.7" />
+            <stop offset="1" stopColor="#ffb878" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <g transform={`translate(${sunX} ${SUN_Y0})`}>
+          <circle cx={0} cy={0} r={900} fill="url(#gd-sun)" />
+          <ellipse cx={0} cy={60} rx={1500} ry={220} fill="url(#gd-horizon)" />
+          <circle cx={0} cy={0} r={58} fill="#fff6e2" opacity={0.96} />
         </g>
-      ))}
-      {/* ліхтарі алеї (засвічуються в сутінках) */}
-      <StreetLamp x={-1650} y={-20} s={1.3} glowRef={(el) => void (lampGlow1.current = el)} />
-      <StreetLamp x={-420} y={-20} s={1.3} glowRef={(el) => void (lampGlow2.current = el)} />
-      <Bench x={-1080} y={-12} s={0.9} />
-      {/* пергола тераси з гірляндою */}
-      <g>
+      </FxLayer>
+      <FxLayer ref={rays} bounds={{ x: sunX - 2200, y: SUN_Y0 - 2200, w: 4400, h: 4400 }} pivot={[sunX, SUN_Y0]} initialOpacity={0.4}>
+        <defs>
+          <radialGradient id="gd-ray" cx="0" cy="0" r="2200" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#fff1cf" stopOpacity="0.32" />
+            <stop offset="0.6" stopColor="#fff1cf" stopOpacity="0.06" />
+            <stop offset="1" stopColor="#fff1cf" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <g transform={`translate(${sunX} ${SUN_Y0})`}>
+          {Array.from({ length: 9 }, (_, i) => {
+            const a = (i / 9) * Math.PI * 2
+            const a2 = a + 0.07
+            const d = `M0 0 L${(Math.cos(a) * 2200).toFixed(0)} ${(Math.sin(a) * 2200).toFixed(0)} L${(Math.cos(a2) * 2200).toFixed(0)} ${(Math.sin(a2) * 2200).toFixed(0)} Z`
+            return <path key={i} d={d} fill="url(#gd-ray)" />
+          })}
+        </g>
+      </FxLayer>
+      <WorldSvg>
+        <defs>
+          <linearGradient id="gd-grass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#a39a5a" />
+            <stop offset="1" stopColor="#6f7a48" />
+          </linearGradient>
+          <linearGradient id="gd-path" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e3cfa8" />
+            <stop offset="1" stopColor="#cbb38a" />
+          </linearGradient>
+          <linearGradient id="gd-deck" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#b98a5c" />
+            <stop offset="1" stopColor="#8e6440" />
+          </linearGradient>
+        </defs>
+        {/* пагорби й далекий ліс у серпанку */}
+        <path d="M-5000 -260 C-3000 -360 -1600 -300 -400 -340 C800 -380 1800 -300 5000 -330 V0 H-5000 Z" fill="#d9a87a" opacity={0.55} />
+        <path d="M-5000 -180 C-3400 -240 -1800 -200 -200 -230 C1400 -260 2600 -200 5000 -220 V0 H-5000 Z" fill="#b98a62" opacity={0.6} />
+        {/* дальній ряд дерев алеї */}
+        {[-2700, -2250, -1800, -1350, -900, -450, 1500, 1950].map((x, i) => (
+          <AutumnTree key={x} x={x} y={-40} s={1.9 + (i % 3) * 0.15} seed={40 + i} palette={i % 2 ? ['#e2a640', '#d58a2f', '#eec46a', '#c76b30'] : ['#e8b64e', '#d9952f', '#efc86a', '#c97b2e']} lit="right" />
+        ))}
+        {/* трава, алея, настил тераси */}
+        <rect x={-5000} y={-60} width={10000} height={3000} fill="url(#gd-grass)" />
+        <path d="M-5000 -18 L320 -18 L380 70 L-5000 70 Z" fill="url(#gd-path)" />
+        <rect x={300} y={-34} width={1100} height={150} fill="url(#gd-deck)" />
+        <g stroke="#7a5236" strokeWidth={2} opacity={0.45}>
+          {Array.from({ length: 12 }, (_, i) => (
+            <line key={i} x1={300 + i * 92} y1={-34} x2={300 + i * 92 - 30} y2={116} />
+          ))}
+        </g>
+        <rect x={300} y={-40} width={1100} height={8} fill="#c99a68" />
+        {/* опале листя на землі */}
+        {GROUND_LEAVES.map(([x, y, k, c], i) => (
+          <g key={i} transform={`translate(${x} ${y}) rotate(${i * 47}) scale(1.6 0.8)`}>
+            <Leaf kind={Number(k)} color={String(c)} vein={false} />
+          </g>
+        ))}
+      </WorldSvg>
+      {/* сяйво ліхтарів алеї (засвічуються в сутінках) */}
+      <FxLayer ref={lampGlow} bounds={{ x: -1650 - 200, y: -20 - 390 - 200, w: 1230 + 400, h: 400 }} initialOpacity={0}>
+        <StreetLamp x={-1650} y={-20} s={1.3} part="glow" />
+        <StreetLamp x={-420} y={-20} s={1.3} part="glow" />
+      </FxLayer>
+      <WorldSvg>
+        <StreetLamp x={-1650} y={-20} s={1.3} part="lamp" />
+        <StreetLamp x={-420} y={-20} s={1.3} part="lamp" />
+        <Bench x={-1080} y={-12} s={0.9} />
+        {/* пергола тераси з гірляндою */}
         <rect x={330} y={-640} width={22} height={620} fill="#7a5236" />
         <rect x={1240} y={-640} width={22} height={620} fill="#6b4630" />
         <rect x={300} y={-660} width={1000} height={20} fill="#8a5d3b" />
@@ -376,48 +374,92 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
             <ellipse key={i} cx={1252 - (i % 3) * 8} cy={-590 + i * 70} rx={14} ry={9} transform={`rotate(${i * 50} ${1252 - (i % 3) * 8} ${-590 + i * 70})`} />
           ))}
         </g>
-        <StringLights x0={340} x1={1250} y={-640} sag={50} n={16} glowRef={(el) => void (bulbs.current = el)} />
-      </g>
+        <StringLights x0={340} x1={1250} y={-640} sag={50} n={16} part="base" />
+      </WorldSvg>
+      {/* сяйво лампочок гірлянди — окремий шар, мерехтить лише прозорістю */}
+      <FxLayer ref={bulbs} bounds={{ x: 300, y: -680, w: 1000, h: 140 }} initialOpacity={0}>
+        <StringLights x0={340} x1={1250} y={-640} sag={50} n={16} part="glow" />
+      </FxLayer>
       {/* квіти і калина на терасі */}
-      <g ref={flowerGlow} opacity={0.25}>
+      <FxLayer ref={flowerGlow} bounds={{ x: 250, y: -170, w: 1110, h: 240 }} initialOpacity={0.25}>
+        <defs>
+          <radialGradient id="gd-flowerglow">
+            <stop offset="0" stopColor="#ffd98f" stopOpacity="0.55" />
+            <stop offset="1" stopColor="#ffd98f" stopOpacity="0" />
+          </radialGradient>
+        </defs>
         <ellipse cx={420} cy={-40} rx={160} ry={90} fill="url(#gd-flowerglow)" />
         <ellipse cx={1150} cy={-50} rx={200} ry={110} fill="url(#gd-flowerglow)" />
-      </g>
-      <FlowerBush x={410} y={-24} s={1.1} seed={51} palette={0} />
-      <FlowerBush x={1120} y={-26} s={1.15} seed={52} palette={1} />
-      <KalynaBush x={1240} y={-30} s={1.1} />
-      <FlowerBush x={1010} y={-20} s={0.85} seed={53} palette={2} />
-      {/* лавка для двох */}
-      <Bench x={BENCH.x} y={BENCH.y} s={1} />
-      <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_AUTUMN} seed={9} shadow={0.25} />
-      <Character ref={man} body={MAN} look={SERHII_LOOK} outfit={M_AUTUMN} seed={10} shadow={0.25} />
-      {/* невеликий столик із двома чашками перед лавкою */}
-      <CafeTable x={TABLE.x} y={TABLE.y} s={0.9} />
-      <g ref={cupW}>
-        <TableCupStatic x={CUP_W.x} y={CUP_W.y} color="#c46b45" />
-      </g>
-      <g ref={cupM}>
-        <TableCupStatic x={CUP_M.x} y={CUP_M.y} color="#2f5b5d" />
-      </g>
-      <path ref={steamW} d="" fill="none" stroke="#fff6e6" strokeWidth={6} strokeLinecap="round" opacity={0} />
-      <path ref={steamM} d="" fill="none" stroke="#fff6e6" strokeWidth={6} strokeLinecap="round" opacity={0} />
+      </FxLayer>
+      <WorldSvg>
+        <FlowerBush x={410} y={-24} s={1.1} seed={51} palette={0} />
+        <FlowerBush x={1120} y={-26} s={1.15} seed={52} palette={1} />
+        <KalynaBush x={1240} y={-30} s={1.1} />
+        <FlowerBush x={1010} y={-20} s={0.85} seed={53} palette={2} />
+        {/* лавка для двох */}
+        <Bench x={BENCH.x} y={BENCH.y} s={1} />
+      </WorldSvg>
+      {/* герої — власний шар */}
+      <WorldSvg layer>
+        <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_AUTUMN} seed={9} shadow={0.25} />
+        <Character ref={man} body={MAN} look={SERHII_LOOK} outfit={M_AUTUMN} seed={10} shadow={0.25} />
+      </WorldSvg>
+      <WorldSvg>
+        {/* невеликий столик із двома чашками перед лавкою */}
+        <CafeTable x={TABLE.x} y={TABLE.y} s={0.9} />
+        <g ref={cupW}>
+          <TableCupStatic x={CUP_W.x} y={CUP_W.y} color="#c46b45" />
+        </g>
+        <g ref={cupM}>
+          <TableCupStatic x={CUP_M.x} y={CUP_M.y} color="#2f5b5d" />
+        </g>
+        <path ref={steamW} d="" fill="none" stroke="#fff6e6" strokeWidth={6} strokeLinecap="round" opacity={0} />
+        <path ref={steamM} d="" fill="none" stroke="#fff6e6" strokeWidth={6} strokeLinecap="round" opacity={0} />
+      </WorldSvg>
       {/* тепло, що повертається: золоті іскорки довкола */}
-      <g ref={sparkleG} opacity={0}>
-        <Motes ref={sparkle} count={36} area={{ x: BENCH.x - 520, y: -620, w: 1040, h: 620 }} seed={61} color="#ffe2a0" size={3} />
-      </g>
-      <Motes ref={motes} count={20} area={{ x: -1800, y: -700, w: 3200, h: 700 }} seed={62} color="#fff0c8" size={2.4} />
-      <LeafField ref={leaves} count={26} area={{ x: -2400, y: -900, w: 3900, h: 960 }} seed={63} scale={1.6} speed={0.7} />
-      <FlowerBush x={-600} y={220} s={2.2} seed={70} palette={0} />
-      <FlowerBush x={1500} y={240} s={2.3} seed={71} palette={1} />
-      <LeafField ref={leavesFront} count={6} area={{ x: -2400, y: -900, w: 3900, h: 1300 }} seed={64} scale={2.4} speed={0.55} />
+      <MoteLayer ref={sparkle} count={36} area={{ x: BENCH.x - 520, y: -620, w: 1040, h: 620 }} seed={61} color="#ffe2a0" size={3} />
+      <MoteLayer ref={motes} count={20} area={{ x: -1800, y: -700, w: 3200, h: 700 }} seed={62} color="#fff0c8" size={2.4} />
+      <LeafLayer ref={leaves} count={26} area={{ x: -2400, y: -900, w: 3900, h: 960 }} seed={63} scale={1.6} speed={0.7} />
+      <WorldSvg>
+        <FlowerBush x={-600} y={220} s={2.2} seed={70} palette={0} />
+        <FlowerBush x={1500} y={240} s={2.3} seed={71} palette={1} />
+      </WorldSvg>
+      <LeafLayer ref={leavesFront} count={6} area={{ x: -2400, y: -900, w: 3900, h: 1300 }} seed={64} scale={2.4} speed={0.55} />
       {/* тепле світло, що огортає героїв (після персонажів — «загортання» світлом) */}
-      <g ref={wrap} opacity={0}>
-        <circle cx={0} cy={0} r={1500} fill="url(#gd-wrap)" />
-      </g>
-      <rect ref={dusk} x={-5000} y={-1400} width={10000} height={2400} fill="url(#gd-dusk)" opacity={0} />
-    </SceneSvg>
+      <FxLayer ref={wrap} bounds={{ x: sunX - 1500, y: SUN_Y0 - 1500, w: 3000, h: 3000 }} initialOpacity={0}>
+        <defs>
+          <radialGradient id="gd-wrap" cx="0" cy="0" r="1500" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#ffd79a" stopOpacity="0.5" />
+            <stop offset="0.5" stopColor="#ffc98a" stopOpacity="0.14" />
+            <stop offset="1" stopColor="#ffc98a" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <g transform={`translate(${sunX} ${SUN_Y0})`}>
+          <circle cx={0} cy={0} r={1500} fill="url(#gd-wrap)" />
+        </g>
+      </FxLayer>
+      <FxLayer ref={dusk} bounds={{ x: -5000, y: -1400, w: 10000, h: 2400 }} initialOpacity={0}>
+        <defs>
+          <linearGradient id="gd-dusk" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#3b3060" stopOpacity="0.55" />
+            <stop offset="0.45" stopColor="#3b3060" stopOpacity="0.18" />
+            <stop offset="1" stopColor="#2a2040" stopOpacity="0.22" />
+          </linearGradient>
+        </defs>
+        <rect x={-5000} y={-1400} width={10000} height={2400} fill="url(#gd-dusk)" />
+      </FxLayer>
+    </SceneFrame>
   )
 }
+
+const GROUND_LEAVES: [number, number, number, string][] = [
+  [-1800, 30, 0, '#d9822b'],
+  [-1500, 52, 1, '#e2a640'],
+  [-1100, 26, 2, '#c4683a'],
+  [-800, 58, 0, '#e8c46a'],
+  [-300, 40, 3, '#d9822b'],
+  [120, 60, 1, '#c4683a'],
+]
 
 function TableCupStatic({ x, y, color }: { x: number; y: number; color: string }) {
   return (

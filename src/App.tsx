@@ -10,7 +10,7 @@ import { StatusLayer } from './components/StatusLayer'
 import { useReducedMotion } from './hooks/useReducedMotion'
 import { SCENES } from './scenes'
 import { FrameBus } from './stage/frameBus'
-import { StoryStage } from './stage/StoryStage'
+import { StageHost } from './stage/StageHost'
 import type { Layout, Screen } from './stage/types'
 import { useStoryLoop } from './stage/useStoryLoop'
 import { CompactRendering, useCompactRendering } from './stage/renderingProfile'
@@ -106,7 +106,7 @@ export function App() {
   return (
     <CompactRendering.Provider value={compact}>
     <div className={`app${started ? ' app--started' : ''}${reduced ? ' app--reduced' : ''}${compact ? ' app--compact' : ''}${ended ? ' app--ended' : ''}`}>
-      <StoryStage scenes={SCENES} bus={bus} layout={layout} />
+      <StageHost scenes={SCENES} bus={bus} layout={layout} compact={compact} />
       <div className="vignette" aria-hidden="true" />
       <div className="bottom-fade" aria-hidden="true" />
       <Banner bus={bus} reduced={reduced} />

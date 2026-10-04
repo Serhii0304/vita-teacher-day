@@ -1,5 +1,6 @@
-import { useMemo, useRef } from 'react'
-import { AutumnTree, LeafField, Motes, type LeafFieldHandle, type MotesHandle } from '../art/common'
+import { useCallback, useMemo, useRef } from 'react'
+import { AutumnTree, type LeafFieldHandle } from '../art/common'
+import { LeafLayer, MoteLayer, type MoteLayerHandle } from '../art/particles'
 import { Fence, FlowerBush, KalynaBush, SchoolFacade } from '../art/outdoor'
 import { MAN, WOMAN } from '../characters/body'
 import { Character, type CharacterHandle } from '../characters/Character'
@@ -8,11 +9,11 @@ import { FACE, HAND, PROP } from '../characters/pose'
 import { gripWorld, targetForGrip } from '../characters/rigMath'
 import { clamp, ease, smoothstep, windowEnv } from '../engine/math'
 import { Actor } from '../stage/actor'
-import { CamTrack, cameraViewBox, rc, setViewBox } from '../stage/camera'
-import type { Layout, RegisterScene } from '../stage/types'
+import { CamTrack, cameraViewBox, rc } from '../stage/camera'
+import { FxLayer, SceneFrame, WorldSvg, type FxHandle, type ViewBox } from '../stage/layers'
+import type { FrameCtx, Layout, RegisterScene, Screen } from '../stage/types'
 import { useTimeline } from '../stage/useTimeline'
 import type { Timeline } from '../story/timeline'
-import { SceneSvg } from './SceneSvg'
 import { pick } from './shared'
 
 /**
@@ -110,104 +111,101 @@ export function Chorus1Scene({ layout, register }: { layout: Layout; register: R
   const man = useRef<CharacterHandle>(null)
   const leaves = useRef<LeafFieldHandle>(null)
   const leavesFront = useRef<LeafFieldHandle>(null)
-  const sparks = useRef<MotesHandle>(null)
-  const sparksG = useRef<SVGGElement>(null)
-  const sunG = useRef<SVGGElement>(null)
-  const wrap = useRef<SVGGElement>(null)
-  const raysR = useRef<SVGGElement>(null)
-  const flash = useRef<SVGRectElement>(null)
-  const line = useRef<SVGGElement>(null)
+  const sparks = useRef<MoteLayerHandle>(null)
+  const sun = useRef<FxHandle>(null)
+  const rays = useRef<FxHandle>(null)
+  const wrap = useRef<FxHandle>(null)
+  const flash = useRef<FxHandle>(null)
+  const line = useRef<FxHandle>(null)
+
+  const view = useCallback((t: number, scr: Screen): ViewBox => cameraViewBox(p.cam.at(t), scr), [p])
+  const update = useCallback(
+    (ctx: FrameCtx) => {
+      const t = ctx.t
+      const wp = p.W.pose(t)
+      woman.current?.apply(wp, t)
+      man.current?.apply(p.M.pose(t), t)
+      leaves.current?.update(t, 1, 0.4)
+      leavesFront.current?.update(t * 0.8, 1, 0.5)
+      // сонце, промені, сяйво й спалах — окремі шари: лише прозорість і поворот (композитор)
+      const L = p.light(t)
+      sun.current?.opacity(L)
+      rays.current?.opacity(L)
+      rays.current?.move(0, 0, t * 1.1)
+      wrap.current?.opacity(0.15 + (0.6 * (L - 0.45)) / 0.55)
+      const sp = p.sparks(t)
+      sparks.current?.follow(wp.x + 40, wp.y - 320)
+      sparks.current?.update(t * 1.3, sp * sp)
+      flash.current?.opacity(clamp(p.flash(t)))
+      line.current?.opacity(p.line(t))
+    },
+    [p],
+  )
 
   return (
-    <SceneSvg
-      id="chorus1"
-      label="Приспів: він дарує їй букет у золотому світлі"
-      register={register}
-      update={(ctx, svg) => {
-        const t = ctx.t
-        const wp = p.W.pose(t)
-        woman.current?.apply(wp, t)
-        man.current?.apply(p.M.pose(t), t)
-        leaves.current?.update(t, 1, 0.4)
-        leavesFront.current?.update(t * 0.8, 1, 0.5)
-        const L = p.light(t)
-        if (sunG.current) sunG.current.style.opacity = L.toFixed(3)
-        if (wrap.current) wrap.current.style.opacity = (0.15 + 0.6 * (L - 0.45) / 0.55).toFixed(3)
-        if (raysR.current) raysR.current.setAttribute('transform', `translate(-820 -760) rotate(${(t * 1.1).toFixed(2)})`)
-        const sp = p.sparks(t)
-        if (sparksG.current) {
-          sparksG.current.style.opacity = sp.toFixed(3)
-          sparksG.current.setAttribute('transform', `translate(${(wp.x + 40).toFixed(1)} ${(wp.y - 320).toFixed(1)})`)
-        }
-        sparks.current?.update(t * 1.3, sp)
-        if (flash.current) flash.current.style.opacity = clamp(p.flash(t)).toFixed(3)
-        if (line.current) line.current.style.opacity = p.line(t).toFixed(3)
-        setViewBox(svg, cameraViewBox(p.cam.at(t), ctx.screen))
-      }}
-    >
-      <defs>
-        <linearGradient id="c1-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f3c98a" />
-          <stop offset="0.55" stopColor="#f6dcaa" />
-          <stop offset="1" stopColor="#f3c58f" />
-        </linearGradient>
-        <radialGradient id="c1-rayR" cx="0" cy="0" r="2400" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fff3d2" stopOpacity="0.3" />
-          <stop offset="0.6" stopColor="#fff3d2" stopOpacity="0.06" />
-          <stop offset="1" stopColor="#fff3d2" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="c1-wrap">
-          <stop offset="0" stopColor="#ffe0a6" stopOpacity="0.55" />
-          <stop offset="0.55" stopColor="#ffd08a" stopOpacity="0.16" />
-          <stop offset="1" stopColor="#ffd08a" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="c1-sun" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#fff6dc" stopOpacity="1" />
-          <stop offset="0.25" stopColor="#ffe3a3" stopOpacity="0.75" />
-          <stop offset="1" stopColor="#ffd27a" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="c1-ground" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#d9c3a0" />
-          <stop offset="1" stopColor="#b99a74" />
-        </linearGradient>
-        <linearGradient id="c1-ray" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#fff3cf" stopOpacity="0.6" />
-          <stop offset="1" stopColor="#fff3cf" stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id="c1-line" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#ffd98f" stopOpacity="0" />
-          <stop offset="0.5" stopColor="#fff4d6" stopOpacity="1" />
-          <stop offset="1" stopColor="#ffd98f" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <rect x={-3000} y={-2600} width={6000} height={2600} fill="url(#c1-sky)" />
-      {/* далекі дерева в серпанку */}
-      <g opacity={0.55}>
-        <AutumnTree x={-1300} y={-60} s={1.4} seed={11} palette={['#e8c27e', '#e2b06a', '#f0d39a']} trunk="#a88a6a" />
-        <AutumnTree x={1250} y={-60} s={1.5} seed={12} palette={['#e8c27e', '#e2b06a', '#f0d39a']} trunk="#a88a6a" />
-      </g>
-      <SchoolFacade x={-760} y={-720} w={1240} h={660} />
-      <Fence x0={-1800} x1={1800} y={-40} h={64} />
-      <rect x={-3000} y={-46} width={6000} height={2400} fill="url(#c1-ground)" />
-      <g stroke="#b39770" strokeWidth={2} opacity={0.4}>
-        {[-20, 20, 70, 140, 240].map((yy) => (
-          <line key={yy} x1={-3000} x2={3000} y1={yy} y2={yy} />
-        ))}
-      </g>
-      {/* дерева, що обрамлюють */}
-      <AutumnTree x={-1020} y={-30} s={2.1} seed={5} />
-      <AutumnTree x={880} y={-30} s={2.2} seed={6} palette={['#e8a63c', '#d9822b', '#efc35e', '#c86a2e']} />
-      <FlowerBush x={-560} y={-10} s={1.1} seed={2} palette={0} />
-      <FlowerBush x={-420} y={-6} s={0.9} seed={3} palette={2} />
-      <FlowerBush x={420} y={-8} s={1.05} seed={4} palette={1} />
-      <KalynaBush x={590} y={-20} s={1.1} />
-      <FlowerBush x={330} y={-2} s={0.8} seed={8} palette={3} />
-      {/* сонце і промені */}
-      <g ref={sunG}>
+    <SceneFrame id="chorus1" label="Приспів: він дарує їй букет у золотому світлі" register={register} view={view} update={update}>
+      <WorldSvg>
+        <defs>
+          <linearGradient id="c1-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#f3c98a" />
+            <stop offset="0.55" stopColor="#f6dcaa" />
+            <stop offset="1" stopColor="#f3c58f" />
+          </linearGradient>
+          <linearGradient id="c1-ground" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#d9c3a0" />
+            <stop offset="1" stopColor="#b99a74" />
+          </linearGradient>
+        </defs>
+        <rect x={-3000} y={-2600} width={6000} height={2600} fill="url(#c1-sky)" />
+        {/* далекі дерева в серпанку */}
+        <g opacity={0.55}>
+          <AutumnTree x={-1300} y={-60} s={1.4} seed={11} palette={['#e8c27e', '#e2b06a', '#f0d39a']} trunk="#a88a6a" />
+          <AutumnTree x={1250} y={-60} s={1.5} seed={12} palette={['#e8c27e', '#e2b06a', '#f0d39a']} trunk="#a88a6a" />
+        </g>
+        <SchoolFacade x={-760} y={-720} w={1240} h={660} />
+        <Fence x0={-1800} x1={1800} y={-40} h={64} />
+        <rect x={-3000} y={-46} width={6000} height={2400} fill="url(#c1-ground)" />
+        <g stroke="#b39770" strokeWidth={2} opacity={0.4}>
+          {[-20, 20, 70, 140, 240].map((yy) => (
+            <line key={yy} x1={-3000} x2={3000} y1={yy} y2={yy} />
+          ))}
+        </g>
+        {/* дерева, що обрамлюють */}
+        <AutumnTree x={-1020} y={-30} s={2.1} seed={5} />
+        <AutumnTree x={880} y={-30} s={2.2} seed={6} palette={['#e8a63c', '#d9822b', '#efc35e', '#c86a2e']} />
+        <FlowerBush x={-560} y={-10} s={1.1} seed={2} palette={0} />
+        <FlowerBush x={-420} y={-6} s={0.9} seed={3} palette={2} />
+        <FlowerBush x={420} y={-8} s={1.05} seed={4} palette={1} />
+        <KalynaBush x={590} y={-20} s={1.1} />
+        <FlowerBush x={330} y={-2} s={0.8} seed={8} palette={3} />
+      </WorldSvg>
+      {/* сонце і нерухомі промені */}
+      <FxLayer ref={sun} bounds={{ x: -1720, y: -1660, w: 2420, h: 1800 }} initialOpacity={0.45}>
+        <defs>
+          <radialGradient id="c1-sun" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor="#fff6dc" stopOpacity="1" />
+            <stop offset="0.25" stopColor="#ffe3a3" stopOpacity="0.75" />
+            <stop offset="1" stopColor="#ffd27a" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="c1-ray" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#fff3cf" stopOpacity="0.6" />
+            <stop offset="1" stopColor="#fff3cf" stopOpacity="0" />
+          </linearGradient>
+        </defs>
         <circle cx={-820} cy={-760} r={900} fill="url(#c1-sun)" />
         <path d="M-900 -900 L-760 -940 L300 120 L-120 120 Z" fill="url(#c1-ray)" opacity={0.6} />
         <path d="M-700 -980 L-600 -990 L700 80 L420 100 Z" fill="url(#c1-ray)" opacity={0.45} />
-        <g ref={raysR}>
+      </FxLayer>
+      {/* повільно обертові промені — поворот шару навколо сонця */}
+      <FxLayer ref={rays} bounds={{ x: -820 - 2400, y: -760 - 2400, w: 4800, h: 4800 }} pivot={[-820, -760]} initialOpacity={0.45}>
+        <defs>
+          <radialGradient id="c1-rayR" cx="0" cy="0" r="2400" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#fff3d2" stopOpacity="0.3" />
+            <stop offset="0.6" stopColor="#fff3d2" stopOpacity="0.06" />
+            <stop offset="1" stopColor="#fff3d2" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <g transform="translate(-820 -760)">
           {Array.from({ length: 10 }, (_, i) => {
             const a = (i / 10) * Math.PI * 2
             const b = a + 0.06
@@ -215,25 +213,41 @@ export function Chorus1Scene({ layout, register }: { layout: Layout; register: R
             return <path key={i} d={d} fill="url(#c1-rayR)" />
           })}
         </g>
-      </g>
-      <LeafField ref={leaves} count={22} area={{ x: -900, y: -900, w: 1800, h: 960 }} seed={13} scale={1.6} speed={0.75} />
-      <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_TEACHER} seed={3} shadow={0.28} />
-      <Character ref={man} body={MAN} look={SERHII_LOOK} outfit={M_SMART} seed={4} shadow={0.28} />
-      <g ref={sparksG} opacity={0}>
-        <Motes ref={sparks} count={22} area={{ x: -150, y: -140, w: 300, h: 260 }} seed={17} color="#ffe6a8" size={3} />
-      </g>
+      </FxLayer>
+      <LeafLayer ref={leaves} count={22} area={{ x: -900, y: -900, w: 1800, h: 960 }} seed={13} scale={1.6} speed={0.75} />
+      <WorldSvg layer>
+        <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_TEACHER} seed={3} shadow={0.28} />
+        <Character ref={man} body={MAN} look={SERHII_LOOK} outfit={M_SMART} seed={4} shadow={0.28} />
+      </WorldSvg>
+      <MoteLayer ref={sparks} count={22} area={{ x: -150, y: -140, w: 300, h: 260 }} seed={17} color="#ffe6a8" size={3} />
       {/* тепле світло, що огортає героїв і посилюється на «вертається тепло» */}
-      <g ref={wrap} opacity={0}>
+      <FxLayer ref={wrap} bounds={{ x: -740, y: -800, w: 1400, h: 1040 }} initialOpacity={0}>
+        <defs>
+          <radialGradient id="c1-wrap">
+            <stop offset="0" stopColor="#ffe0a6" stopOpacity="0.55" />
+            <stop offset="0.55" stopColor="#ffd08a" stopOpacity="0.16" />
+            <stop offset="1" stopColor="#ffd08a" stopOpacity="0" />
+          </radialGradient>
+        </defs>
         <ellipse cx={-40} cy={-280} rx={700} ry={520} fill="url(#c1-wrap)" />
-      </g>
-      <LeafField ref={leavesFront} count={5} area={{ x: -900, y: -900, w: 1800, h: 1300 }} seed={31} scale={2.2} speed={0.6} colors={['#e2a640', '#e8c46a', '#d9822b']} opacity={0.9} />
+      </FxLayer>
+      <LeafLayer ref={leavesFront} count={5} area={{ x: -900, y: -900, w: 1800, h: 1300 }} seed={31} scale={2.2} speed={0.6} colors={FRONT_LEAVES} opacity={0.9} />
       {/* тепла лінія світла — перехід до розмови телефоном */}
-      <g ref={line} opacity={0}>
+      <FxLayer ref={line} bounds={{ x: -2000, y: -2400, w: 4000, h: 4800 }} initialOpacity={0}>
+        <defs>
+          <linearGradient id="c1-line" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#ffd98f" stopOpacity="0" />
+            <stop offset="0.5" stopColor="#fff4d6" stopOpacity="1" />
+            <stop offset="1" stopColor="#ffd98f" stopOpacity="0" />
+          </linearGradient>
+        </defs>
         <rect x={-2000} y={-2400} width={4000} height={4800} fill="#ffe7b4" opacity={0.55} />
         <rect x={-60} y={-2400} width={120} height={4800} fill="url(#c1-line)" />
-      </g>
+      </FxLayer>
       {/* спалах тепла на вході (продовження світла лампи) */}
-      <rect ref={flash} x={-4000} y={-4000} width={8000} height={8000} fill="#fff1cf" opacity={1} />
-    </SceneSvg>
+      <FxLayer ref={flash} bounds={{ x: -4000, y: -4000, w: 8000, h: 8000 }} initialOpacity={1} fill="#fff1cf" />
+    </SceneFrame>
   )
 }
+
+const FRONT_LEAVES = ['#e2a640', '#e8c46a', '#d9822b']

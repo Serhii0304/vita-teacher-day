@@ -17,6 +17,7 @@ import {
 } from './face'
 import type { Outfit, SkinHair } from './palettes'
 import { BookProp, BouquetProp, CupProp, NotebooksProp, PhoneProp } from './props'
+import { armChain } from './rigMath'
 
 export interface CharacterHandle {
   apply(p: Params, t: number): void
@@ -222,12 +223,11 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
       const ffront = p.fFront > 0.5
       const farSide = ffront ? 'FF' : 'F'
       const arm = (side: 'N' | 'F', sh: [number, number], hx: number, hy: number, w: number, abs: number, hand: number, prop: number, fs: number) => {
-        // перспективне скорочення: рука, спрямована до глядача (напр. телефон біля вуха), виглядає коротшою
-        const k1 = 1 - 0.62 * clamp(fs)
-        const k2 = 1 - 0.45 * clamp(fs)
+        // перспективне скорочення: рука, спрямована до глядача (телефон біля вуха), виглядає коротшою;
+        // передпліччя перед корпусом скорочується, щоб лікоть не стирчав за спину (див. armChain)
+        const { k1, k2, ik } = armChain(body, hx, hy, fs)
         const L1 = body.upper * k1
         const L2 = body.fore * k2
-        const ik = solveIK(0, 0, hx, hy, L1, L2, 1)
         const parentAbs = lean + ik.bAbs
         const wrist = lerp(w, w - parentAbs, clamp(abs))
         const chain = `${tc} translate(${sh[0]} ${r(sh[1] - breath * 0.5)})`

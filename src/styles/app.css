@@ -32,12 +32,7 @@
   contain: layout paint;
   isolation: isolate;
 }
-.scene-rays {
-  mix-blend-mode: screen;
-}
-.app--compact .scene-rays {
-  mix-blend-mode: normal;
-}
+
 .app--compact .lyrics__line {
   text-shadow: 0 1px 3px rgba(18, 10, 6, 0.9);
 }
@@ -48,7 +43,48 @@
 }
 .stage .scene {
   display: block;
+  overflow: hidden;
   will-change: opacity;
+}
+/* Камера: GPU-трансформація готового растру, без перемальовування ілюстрації */
+.scene__cam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.scene__world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.scene__world--layer {
+  will-change: transform;
+}
+/* Світлові ефекти — окремі шари: змінюються лише прозорість і трансформація */
+.scene__fx {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.scene__fx > svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* вміст рухається всередині нерухомої рамки (хмаринки за шибкою) */
+.scene__fx--clip {
+  overflow: hidden;
+  will-change: opacity;
+}
+.scene__fx--clip > svg {
+  will-change: transform;
 }
 
 .vignette {
@@ -706,4 +742,88 @@
 .app--reduced .final__replay,
 .app--reduced .status__dot {
   animation: none;
+}
+
+/* Частинки (листя, пилинки) — кожна окремий композитний шар: рух і мерехтіння без перемальовування */
+.particles {
+  position: absolute;
+  pointer-events: none;
+}
+.particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  will-change: transform;
+  transform-origin: 50% 50%;
+}
+.particle--dot {
+  border-radius: 50%;
+  will-change: transform, opacity;
+}
+.particle--mote {
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--c) 0 30%, transparent 70%);
+  background: radial-gradient(circle, var(--c) 0 30%, color-mix(in srgb, var(--c) 40%, transparent) 48%, transparent 70%);
+  will-change: transform, opacity;
+}
+
+/* Розмова телефоном: дві панелі з власними камерами, лінія світла між ними */
+.phone__bg {
+  position: absolute;
+  inset: 0;
+  background: #2a1d18;
+}
+.phone__panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.phone__inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.phone__view {
+  position: absolute;
+  inset: 0;
+}
+.phone__view--mirror {
+  transform: scaleX(-1);
+}
+.phone__kin {
+  position: absolute;
+  inset: 0;
+  background: #ffb866;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+.phone__divider {
+  position: absolute;
+  background: #ffe7b4;
+  will-change: opacity;
+}
+.phone__glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 226, 164, 0.9), rgba(255, 208, 122, 0));
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.phone__overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  will-change: transform;
 }
