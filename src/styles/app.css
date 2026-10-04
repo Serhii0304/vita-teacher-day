@@ -60,6 +60,15 @@
   transform-origin: 0 0;
   will-change: transform;
 }
+.scene__mobile-camera,
+.scene__mobile-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.scene__mobile-canvas {
+  display: block;
+}
 .scene__world {
   position: absolute;
   left: 0;

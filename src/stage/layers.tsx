@@ -3,22 +3,12 @@ import { sceneSchedule } from '../story/SceneTimeline'
 import { CompactRendering } from './renderingProfile'
 import { cameraTransform, computeEnvelope, cropToEnvelope, rasterQuality, type SceneEnvelope, type ViewFn } from './envelope'
 import type { FrameCtx, RegisterScene, SceneId, Screen } from './types'
-import { bakeWorld, standaloneSvg } from './bakeWorld'
-import { bitmapSize, viewportWorld } from './rasterBudget'
+import { MobileCamLayer, MobileWorldSvg, MobileFxLayer, type MobileFxProps, type WorldProps } from './mobileLayers'
 
 /**
- * ШАРИ СЦЕНИ — головна оптимізація плавності.
- *
- * Раніше камера щокадру змінювала viewBox усього SVG, і браузер змушений був заново
- * растеризувати всю повноекранну ілюстрацію (сотні контурів із градієнтами) на кожному кадрі.
- * Тепер:
- *  • ілюстрація сцени растеризується один раз — у розмірі, що покриває весь шлях камери в епізоді;
- *  • на ПК камера рухає SVG-шари CSS-трансформаціями;
- *  • на телефоні тло кешується у canvas з лімітом пікселів; показується тільки екранний фрагмент,
- *    а рухомі SVG теж обмежені розміром екрана, незалежно від шляху камери;
- *  • перемальовуються лише ділянки, що справді змінюються (персонажі, дрібні предмети);
- *  • великі світлові ефекти (сяйва, промені, сонце, затемнення) живуть в окремих шарах FxLayer
- *    і змінюють тільки CSS-прозорість/трансформацію — це робота композитора, не растеризації.
+ * Desktop keeps the original SVG/CSS camera layers and effects.
+ * Compact mode delegates to mobileLayers: one bounded canvas per camera,
+ * cached decorations, and live Canvas paths driven by the same scene poses.
  */
 export type { SceneEnvelope, ViewBox, ViewFn } from './envelope'
 
@@ -87,6 +77,11 @@ export interface CamLayerHandle {
 
 /** Шар камери: ілюстрація растризується один раз, рух камери — трансформація композитного шару. */
 export function CamLayer({ children, ref }: { children: ReactNode; ref?: Ref<CamLayerHandle> }) {
+  const compact = useContext(CompactRendering)
+  return compact ? <MobileCamLayer ref={ref}>{children}</MobileCamLayer> : <DesktopCamLayer ref={ref}>{children}</DesktopCamLayer>
+}
+
+function DesktopCamLayer({ children, ref }: { children: ReactNode; ref?: Ref<CamLayerHandle> }) {
   const compact = useContext(CompactRendering)
   const cam = useRef<HTMLDivElement>(null)
   const worlds = useRef(new Set<WorldEntry>())
@@ -254,96 +249,22 @@ function applyEnvelope(cam: HTMLDivElement | null, worlds: Set<WorldEntry>, fxs:
 }
 
 /** Частина ілюстрації у світових координатах сцени (усі WorldSvg однієї сцени точно накладаються). */
-export function WorldSvg({ children, className, layer = false, dynamic = false }: { children: ReactNode; className?: string; layer?: boolean; dynamic?: boolean }) {
-  const ref = useRef<SVGSVGElement>(null)
-  const bitmap = useRef<HTMLDivElement>(null)
-  const canvas = useRef<HTMLCanvasElement>(null)
+export function WorldSvg(props: WorldProps) {
   const compact = useContext(CompactRendering)
-  const bake = compact && !layer && !dynamic
+  return compact ? <MobileWorldSvg {...props} /> : <DesktopWorldSvg {...props} />
+}
+
+function DesktopWorldSvg({ children, className, layer = false }: WorldProps) {
+  const ref = useRef<SVGSVGElement>(null)
   const reg = useContext(Registry)
   useLayoutEffect(() => {
     const el = ref.current
     if (!el || !reg) return
-    if (!compact) {
-      el.style.width = ''; el.style.height = ''; el.style.transform = ''
-    }
-    let cancel = () => {}
-    let fallback = false
-    let projectionKey = ''
-    let projection: ReturnType<typeof viewportWorld> | null = null
-    let source: HTMLCanvasElement | null = null
-    let sourceEnvelope: SceneEnvelope | null = null
-    const project = () => {
-      if (!projection) return
-      const p = projection
-      const key = `${p.viewBox}|${p.transform}|${p.width}|${p.height}`
-      if (key === projectionKey) return
-      projectionKey = key
-      const host = bitmap.current ?? el
-      host.style.width = `${p.width}px`
-      host.style.height = `${p.height}px`
-      host.style.transform = p.transform
-      if (!bake || fallback) el.setAttribute('viewBox', p.viewBox)
-      else if (source && sourceEnvelope && canvas.current) {
-        const cv = canvas.current
-        const size = bitmapSize(p.width, p.height)
-        if (cv.width !== size.width) cv.width = size.width
-        if (cv.height !== size.height) cv.height = size.height
-        const ctx = cv.getContext('2d', { alpha: true })
-        if (!ctx) return
-        const e = sourceEnvelope
-        const [x, y, w, h] = p.box
-        ctx.clearRect(0, 0, cv.width, cv.height)
-        ctx.drawImage(source, (x - e.x) / e.w * source.width, (y - e.y) / e.h * source.height,
-          w / e.w * source.width, h / e.h * source.height, 0, 0, cv.width, cv.height)
-      }
-    }
-    const off = reg.addWorld({
-      apply(e) {
-        applyWorld(el, e)
-        projectionKey = ''
-        if (!bake || !canvas.current) return
-        cancel()
-        const cv = canvas.current
-        fallback = false
-        el.style.display = 'none'
-        const buffer = document.createElement('canvas')
-        // The cached world is bounded, and only its visible crop is submitted to the compositor.
-        cancel = bakeWorld(el, buffer, e.w * e.k, e.h * e.k,
-          () => {
-            if (source) { source.width = 1; source.height = 1 }
-            source = buffer
-            sourceEnvelope = e
-            cv.style.display = ''; el.style.display = 'none'; fallback = false
-            projectionKey = ''; project()
-          },
-          () => { el.style.display = ''; cv.style.display = 'none'; fallback = true; projectionKey = ''; project() })
-      },
-      frame: compact ? (env, view, scr) => {
-        projection = viewportWorld(env, view, scr)
-        project()
-      } : undefined,
-    })
-    return () => {
-      cancel(); off()
-      if (source) { source.width = 1; source.height = 1; source = null }
-      if (canvas.current) { canvas.current.width = 1; canvas.current.height = 1 }
-    }
-  }, [reg, compact, bake])
-  useWarmup(bake ? bitmap : ref)
-  // layer — власний композитний шар (для персонажів): їхній рух перемальовує лише їх самих, а не тло під ними
+    return reg.addWorld({ apply(e) { applyWorld(el, e) } })
+  }, [reg])
+  useWarmup(ref)
   const cls = `scene__world${layer ? ' scene__world--layer' : ''}${className ? ` ${className}` : ''}`
-  if (bake) return (
-    <div ref={bitmap} className={`${cls} scene__world--bitmap`}>
-      <svg ref={ref} preserveAspectRatio="none" aria-hidden="true" focusable="false" style={{ display: 'none' }}>{children}</svg>
-      <canvas ref={canvas} aria-hidden="true" style={{ display: 'none' }} />
-    </div>
-  )
-  return (
-    <svg ref={ref} className={cls} preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      {children}
-    </svg>
-  )
+  return <svg ref={ref} className={cls} preserveAspectRatio="none" aria-hidden="true" focusable="false">{children}</svg>
 }
 
 export interface FxHandle {
@@ -359,14 +280,18 @@ export interface FxHandle {
  * clip — вміст обрізається межами bounds, а move() зсуває вміст усередині цих меж
  * (напр. хмаринки, що пливуть за шибкою).
  */
-export function FxLayer({
+export function FxLayer(props: MobileFxProps) {
+  const compact = useContext(CompactRendering)
+  return compact ? <MobileFxLayer {...props} /> : <DesktopFxLayer {...props} />
+}
+
+function DesktopFxLayer({
   bounds,
   pivot,
   travel = 0,
   initialOpacity = 1,
   fill,
   clip = false,
-  soft = true,
   children,
   ref,
 }: {
@@ -389,11 +314,7 @@ export function FxLayer({
 }) {
   const div = useRef<HTMLDivElement>(null)
   const svg = useRef<SVGSVGElement>(null)
-  const canvas = useRef<HTMLCanvasElement>(null)
   const reg = useContext(Registry)
-  const compact = useContext(CompactRendering)
-  const bakeOn = compact && soft && fill == null && !clip
-  const baked = useRef('')
   useWarmup(div)
   const state = useRef({ op: initialOpacity, dx: 0, dy: 0, rot: 0, sc: 1, k: 1, lastT: '', lastO: '' })
   const write = () => {
@@ -430,7 +351,6 @@ export function FxLayer({
   }))
   useLayoutEffect(() => {
     if (!reg) return
-    if (!bakeOn && svg.current) svg.current.style.display = ''
     const off = reg.addFx({
       apply(e: SceneEnvelope) {
         const d = div.current
@@ -450,11 +370,10 @@ export function FxLayer({
         if (target) target.style.transformOrigin = `${px.toFixed(2)}px ${py.toFixed(2)}px`
         state.current.lastT = ''
         write()
-        if (bakeOn && svg.current && canvas.current) bakeSoftLayer(svg.current, canvas.current, c.w * k, c.h * k, baked)
       },
     })
-    return () => { off(); baked.current = '' }
-  }, [reg, bounds.x, bounds.y, bounds.w, bounds.h, pivot?.[0], pivot?.[1], clip, travel, bakeOn])
+    return off
+  }, [reg, bounds.x, bounds.y, bounds.w, bounds.h, pivot?.[0], pivot?.[1], clip, travel])
   const hidden = initialOpacity <= 0.002
   return (
     <div
@@ -467,43 +386,8 @@ export function FxLayer({
           {children}
         </svg>
       )}
-      {bakeOn && <canvas ref={canvas} aria-hidden="true" style={{ display: 'none' }} />}
     </div>
   )
-}
-
-/** Скільки пікселів полотна на CSS-піксель шару для м’якого світла на телефоні. */
-const SOFT_SCALE = 0.35
-const SOFT_MAX = 1024
-
-/**
- * Малює SVG світлового шару в маленьке полотно (один раз для заданого розміру) і показує полотно замість SVG.
- * Посилання на градієнти сусідніх SVG додаються до самодостатнього зображення.
- */
-function bakeSoftLayer(svgEl: SVGSVGElement, cv: HTMLCanvasElement, cssW: number, cssH: number, baked: { current: string }) {
-  let s = SOFT_SCALE
-  const longest = Math.max(cssW, cssH) * s
-  if (longest > SOFT_MAX) s *= SOFT_MAX / longest
-  const W = Math.max(2, Math.round(cssW * s))
-  const H = Math.max(2, Math.round(cssH * s))
-  const key = `${W}x${H}|${svgEl.getAttribute('viewBox')}`
-  if (baked.current === key) return
-  baked.current = key
-  const img = new Image()
-  img.onload = () => {
-    if (baked.current !== key) return
-    cv.width = W
-    cv.height = H
-    const ctx = cv.getContext('2d')
-    if (!ctx) return
-    ctx.clearRect(0, 0, W, H)
-    ctx.drawImage(img, 0, 0, W, H)
-    cv.style.display = ''
-    svgEl.style.display = 'none'
-  }
-  // якщо щось пішло не так — лишається звичайний SVG
-  img.onerror = () => void (baked.current = '')
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(standaloneSvg(svgEl, W, H))}`
 }
 
 /** Доступ до реєстру сцени (для шарів частинок, що позиціонуються у світових координатах). */

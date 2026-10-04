@@ -3,6 +3,7 @@ import { bitmapSize } from './rasterBudget'
 interface Job {
   run(): Promise<void>
   cancelled: boolean
+  priority: number
 }
 
 // Decode one backdrop at a time. Crossfades must not launch a burst of SVG image decoders.
@@ -60,7 +61,7 @@ export function standaloneSvg(source: SVGSVGElement, width: number, height: numb
 }
 
 /** Prepare an explicitly bounded bitmap; return a cancellation function for resize/unmount. */
-export function bakeWorld(source: SVGSVGElement, canvas: HTMLCanvasElement, cssW: number, cssH: number, ready: () => void, failed: () => void) {
+export function bakeWorld(source: SVGSVGElement, canvas: HTMLCanvasElement, cssW: number, cssH: number, ready: () => void, failed: () => void, priority = 0) {
   let image: HTMLImageElement | null = null
   let url = ''
   let finish: (() => void) | null = null
@@ -72,6 +73,7 @@ export function bakeWorld(source: SVGSVGElement, canvas: HTMLCanvasElement, cssW
   }
   const job: Job = {
     cancelled: false,
+    priority,
     run: () => new Promise<void>(resolve => {
       finish = resolve
       try {
@@ -101,6 +103,8 @@ export function bakeWorld(source: SVGSVGElement, canvas: HTMLCanvasElement, cssW
     }),
   }
   jobs.push(job)
+  // Furniture/backgrounds are ready before optional glow layers after a seek.
+  jobs.sort((a, b) => a.priority - b.priority)
   drain()
   return () => { job.cancelled = true; release() }
 }
