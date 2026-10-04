@@ -22,50 +22,9 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
     let raf = 0
     let force = true
     let lastTime = -1
-    // легкі кадри: камера, частинки, світло (композитор) — до 60 на секунду навіть на телефоні;
-    // важкі: персонажі й зміни SVG — на телефоні 30 на секунду
+    // A steady mobile budget also limits compositor submissions. RAF frequency is
+    // not proof that the GPU presented those frames, so do not use it to retry 60 Hz.
     const pacer = new FramePacer()
-    const heavyPacer = new FramePacer()
-    // Запобіжник для слабших телефонів: якщо пристрій двічі поспіль (по 2 с) не встигає за легкими кадрами,
-    // їх частота знижується до 30 (як було раніше), а згодом пробуємо 60 знову; за потреби важкі кадри — до 20.
-    let lightCap = 60
-    let heavyCap = 30
-    let winStart = 0
-    let winFrames = 0
-    let strikes = 0
-    let retryAt = 0
-    let retryGap = 15000
-    const adapt = (now: number, playing: boolean) => {
-      if (!playing || !compactRef.current || reducedRef.current) {
-        winStart = 0
-        return
-      }
-      if (!winStart) {
-        winStart = now
-        winFrames = 0
-        return
-      }
-      winFrames++
-      const span = now - winStart
-      if (span < 2000) return
-      const fps = (winFrames * 1000) / span
-      winStart = now
-      winFrames = 0
-      const slow = lightCap > 30 ? fps < 45 : heavyCap > 20 && fps < 24
-      strikes = slow ? strikes + 1 : 0
-      if (strikes >= 2) {
-        strikes = 0
-        if (lightCap > 30) {
-          lightCap = 30
-          retryAt = now + retryGap
-          retryGap = Math.min(retryGap * 2, 120000)
-        } else heavyCap = 20
-      } else if (lightCap === 30 && heavyCap > 20 && retryAt && now >= retryAt) {
-        // спроба повернути плавні 60 кадрів (наприклад, після важкого переходу між сценами)
-        lightCap = 60
-        retryAt = 0
-      }
-    }
     let keysFor: Timeline | null = null
     let keys: number[] = []
     const frame = (now: number) => {
@@ -73,13 +32,10 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       if (document.visibilityState === 'hidden') return
       const playing = !engine.el.paused || engine.getSnapshot().wantsPlay
       // 120 Hz screens must not double SVG work. User actions still draw at once.
-      if (!pacer.take(now, reducedRef.current ? 12 : compactRef.current ? lightCap : 60, force)) {
+      if (!pacer.take(now, reducedRef.current ? 12 : compactRef.current ? 30 : 60, force)) {
         if (playing) schedule()
         return
       }
-      const heavy = heavyPacer.take(now, reducedRef.current ? 12 : compactRef.current ? Math.min(heavyCap, lightCap) : 60, force)
-      if (force) winStart = 0
-      else adapt(now, playing)
       const tl = timelineStore.get()
       if (keysFor !== tl) {
         keys = reducedKeys(tl)
@@ -88,7 +44,7 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       const tReal = engine.time()
       const t = reducedRef.current ? snapToKey(keys, tReal) : tReal
       if (force || tReal !== lastTime) {
-        bus.run({ t, tReal, tl, screen: screen.current!, reduced: reducedRef.current, heavy })
+        bus.run({ t, tReal, tl, screen: screen.current!, reduced: reducedRef.current, heavy: true })
         lastTime = tReal
       }
       force = false
