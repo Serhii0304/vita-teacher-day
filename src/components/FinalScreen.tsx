@@ -15,6 +15,7 @@ export const FinalScreen = memo(function FinalScreen({ bus, ended, onReplay, red
   useEffect(
     () =>
       bus.add((ctx) => {
+        if (!ctx.heavy) return
         const node = msg.current
         if (!node) return
         const w = finalMessageWindow(ctx.tl)

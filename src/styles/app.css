@@ -76,14 +76,24 @@
   top: 0;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  /* шар обрізано до області, яку бачить камера (див. cropToEnvelope) — далі нічого не малюємо */
+  overflow: hidden;
 }
 /* вміст рухається всередині нерухомої рамки (хмаринки за шибкою) */
 .scene__fx--clip {
   overflow: hidden;
   will-change: opacity;
 }
+/* м’яке світло на телефоні — заздалегідь намальоване маленьке полотно, яке розтягує відеокарта */
+.scene__fx > canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
 .scene__fx--clip > svg {
+  overflow: visible;
   will-change: transform;
 }
 

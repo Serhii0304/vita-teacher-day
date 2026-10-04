@@ -213,9 +213,11 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
         man.current?.apply(p.M.pose(t), t)
       }
       const calm = p.calm(t)
-      leaves.current?.update(t * (0.4 + 0.6 * calm), Math.max(0.35, calm), 0.6)
-      leavesFront.current?.update(t * 0.7, calm, 0.6)
-      motes.current?.update(t, 0.7)
+      if (ctx.heavy) {
+        leaves.current?.update(t * (0.4 + 0.6 * calm), Math.max(0.35, calm), 0.6)
+        leavesFront.current?.update(t * 0.7, calm, 0.6)
+        motes.current?.update(t, 0.7)
+      }
       // світло — окремі шари: змінюються лише прозорість, зсув і поворот (робота композитора)
       const lg = p.lights(t)
       bulbs.current?.opacity(lg * (0.85 + 0.15 * Math.sin(t * 2.1)))
@@ -230,7 +232,7 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
       wrap.current?.move(0, dy)
       wrap.current?.opacity(0.55 * r)
       const gl = p.glow(t)
-      sparkle.current?.update(t, gl * gl)
+      if (ctx.heavy) sparkle.current?.update(t, gl * gl)
       flowerGlow.current?.opacity(0.25 + 0.75 * gl)
       lampGlow.current?.opacity(p.lamps(t))
       if (!ctx.heavy) return

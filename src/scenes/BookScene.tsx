@@ -81,13 +81,13 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
   const update = useCallback(
     (ctx: FrameCtx) => {
         const t = ctx.t
-        // світло й частинки — щокадру (композитор)
+        // світло — щокадру (композитор)
         sun.current?.opacity(p.glow(t))
+        // частинки й зміни SVG — у «важких» кадрах (на телефоні 30 разів на секунду)
+        if (!ctx.heavy) return
         leaves.current?.update(t * 0.6, 1, 0.6)
         pageLeaves.current?.update(t, 1, 0.3)
         motes.current?.update(t, 0.8)
-        // далі — зміни SVG, що потребують перемальовування: лише у «важких» кадрах
-        if (!ctx.heavy) return
         const o = p.cover(t)
         // обкладинка: вільний край рухається від x=BW до x=-BW, з легкою перспективою
         const xe = BW * Math.cos(o * Math.PI)

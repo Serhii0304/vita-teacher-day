@@ -122,22 +122,22 @@ export function Chorus1Scene({ layout, register }: { layout: Layout; register: R
   const update = useCallback(
     (ctx: FrameCtx) => {
       const t = ctx.t
-      const wp = p.W.pose(t)
       if (ctx.heavy) {
+        const wp = p.W.pose(t)
         woman.current?.apply(wp, t)
         man.current?.apply(p.M.pose(t), t)
+        leaves.current?.update(t, 1, 0.4)
+        leavesFront.current?.update(t * 0.8, 1, 0.5)
+        const sp = p.sparks(t)
+        sparks.current?.follow(wp.x + 40, wp.y - 320)
+        sparks.current?.update(t * 1.3, sp * sp)
       }
-      leaves.current?.update(t, 1, 0.4)
-      leavesFront.current?.update(t * 0.8, 1, 0.5)
       // сонце, промені, сяйво й спалах — окремі шари: лише прозорість і поворот (композитор)
       const L = p.light(t)
       sun.current?.opacity(L)
       rays.current?.opacity(L)
       rays.current?.move(0, 0, t * 1.1)
       wrap.current?.opacity(0.15 + (0.6 * (L - 0.45)) / 0.55)
-      const sp = p.sparks(t)
-      sparks.current?.follow(wp.x + 40, wp.y - 320)
-      sparks.current?.update(t * 1.3, sp * sp)
       flash.current?.opacity(clamp(p.flash(t)))
       line.current?.opacity(p.line(t))
     },

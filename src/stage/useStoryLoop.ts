@@ -26,6 +26,31 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
     // важкі: персонажі й зміни SVG — на телефоні 30 на секунду
     const pacer = new FramePacer()
     const heavyPacer = new FramePacer()
+    // Запобіжник для слабких телефонів: якщо пристрій стабільно не встигає за легкими кадрами,
+    // їх частота знижується до 30 (як було раніше), а далі, за потреби, важких — до 20.
+    let lightCap = 60
+    let heavyCap = 30
+    let winStart = 0
+    let winFrames = 0
+    const adapt = (now: number, playing: boolean) => {
+      if (!playing || !compactRef.current || reducedRef.current) {
+        winStart = 0
+        return
+      }
+      if (!winStart) {
+        winStart = now
+        winFrames = 0
+        return
+      }
+      winFrames++
+      const span = now - winStart
+      if (span < 2000) return
+      const fps = (winFrames * 1000) / span
+      if (lightCap > 30 && fps < 45) lightCap = 30
+      else if (lightCap <= 30 && heavyCap > 20 && fps < 24) heavyCap = 20
+      winStart = now
+      winFrames = 0
+    }
     let keysFor: Timeline | null = null
     let keys: number[] = []
     const frame = (now: number) => {
@@ -33,11 +58,13 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       if (document.visibilityState === 'hidden') return
       const playing = !engine.el.paused || engine.getSnapshot().wantsPlay
       // 120 Hz screens must not double SVG work. User actions still draw at once.
-      if (!pacer.take(now, reducedRef.current ? 12 : 60, force)) {
+      if (!pacer.take(now, reducedRef.current ? 12 : compactRef.current ? lightCap : 60, force)) {
         if (playing) schedule()
         return
       }
-      const heavy = heavyPacer.take(now, reducedRef.current ? 12 : compactRef.current ? 30 : 60, force)
+      const heavy = heavyPacer.take(now, reducedRef.current ? 12 : compactRef.current ? Math.min(heavyCap, lightCap) : 60, force)
+      if (force) winStart = 0
+      else adapt(now, playing)
       const tl = timelineStore.get()
       if (keysFor !== tl) {
         keys = reducedKeys(tl)

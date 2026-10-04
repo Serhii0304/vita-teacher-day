@@ -24,6 +24,8 @@ export const LyricsOverlay = memo(function LyricsOverlay({ bus, visible, reduced
   useEffect(() => {
     current.current = undefined
     return bus.add((ctx) => {
+      // субтитри змінюються повільно — досить «важких» кадрів (на телефоні 30 на секунду)
+      if (!ctx.heavy) return
       const f = lyricFrame(ctx.tl, ctx.tReal)
       const el = box.current
       if (!el) return

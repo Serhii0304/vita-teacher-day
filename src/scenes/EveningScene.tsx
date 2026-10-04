@@ -128,8 +128,10 @@ export function EveningScene({ layout, register }: { layout: Layout; register: R
       const t = ctx.t
       const lamp = p.lamp(t)
       room.current?.update({ lamp, night: 0.15 + lamp * 0.1, clock: 0, cup: p.cup(t), notebooks: p.notebooks(t), cards: p.cards(t), vase: false }, ctx.heavy)
-      if (ctx.heavy) woman.current?.apply(p.W.pose(t), t)
-      motes.current?.update(t, lamp)
+      if (ctx.heavy) {
+        woman.current?.apply(p.W.pose(t), t)
+        motes.current?.update(t, lamp)
+      }
       armFront.current?.opacity(p.armFront(t))
       cool.current?.opacity(0.16 * (1 - lamp))
       bloom.current?.opacity(clamp(p.bloom(t)))
@@ -145,7 +147,7 @@ export function EveningScene({ layout, register }: { layout: Layout; register: R
         <Character ref={woman} body={WOMAN} look={VITA_LOOK} outfit={W_HOME} seed={2} shadow={0.25} />
       </WorldSvg>
       {/* передній підлокітник крісла з’являється, коли героїня сідає */}
-      <FxLayer ref={armFront} bounds={{ x: HER.chairX - 80, y: HER.chairY - 130, w: 200, h: 140 }} initialOpacity={0}>
+      <FxLayer ref={armFront} bounds={{ x: HER.chairX - 80, y: HER.chairY - 130, w: 200, h: 140 }} initialOpacity={0} soft={false}>
         <ArmchairFront x={HER.chairX} y={HER.chairY} s={HER.chairS} />
       </FxLayer>
       <FxLayer ref={cool} bounds={{ x: -2400, y: -1800, w: 5200, h: 3200 }} initialOpacity={0.16} fill="#33405e" />

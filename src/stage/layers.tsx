@@ -277,6 +277,7 @@ export function FxLayer({
   initialOpacity = 1,
   fill,
   clip = false,
+  soft = true,
   children,
   ref,
 }: {
@@ -284,6 +285,12 @@ export function FxLayer({
   pivot?: [number, number]
   /** Наскільки (у світових одиницях) шар зсувається через move() — щоб обрізання не відкрило край. */
   travel?: number
+  /**
+   * М’яке світло (градієнти, сяйва, промені): на телефоні шар один раз малюється в маленьке полотно,
+   * яке розтягує відеокарта, — для плавних градієнтів різниці не видно, а пам’яті й растеризації в десятки разів менше.
+   * false — для шарів із дрібними деталями (меблі, тонкі лінії).
+   */
+  soft?: boolean
   initialOpacity?: number
   /** Однотонна накладка (тонування сцени): шар без SVG, лише колір фону. */
   fill?: string
@@ -293,7 +300,11 @@ export function FxLayer({
 }) {
   const div = useRef<HTMLDivElement>(null)
   const svg = useRef<SVGSVGElement>(null)
+  const canvas = useRef<HTMLCanvasElement>(null)
   const reg = useContext(Registry)
+  const compact = useContext(CompactRendering)
+  const bakeOn = compact && soft && fill == null && !clip
+  const baked = useRef('')
   useWarmup(div)
   const state = useRef({ op: initialOpacity, dx: 0, dy: 0, rot: 0, sc: 1, k: 1, lastT: '', lastO: '' })
   const write = () => {
@@ -349,9 +360,10 @@ export function FxLayer({
         if (target) target.style.transformOrigin = `${px.toFixed(2)}px ${py.toFixed(2)}px`
         state.current.lastT = ''
         write()
+        if (bakeOn && svg.current && canvas.current) bakeSoftLayer(svg.current, canvas.current, c.w * k, c.h * k, baked)
       },
     })
-  }, [reg, bounds.x, bounds.y, bounds.w, bounds.h, pivot?.[0], pivot?.[1], clip, travel])
+  }, [reg, bounds.x, bounds.y, bounds.w, bounds.h, pivot?.[0], pivot?.[1], clip, travel, bakeOn])
   const hidden = initialOpacity <= 0.002
   return (
     <div
@@ -364,8 +376,48 @@ export function FxLayer({
           {children}
         </svg>
       )}
+      {bakeOn && <canvas ref={canvas} aria-hidden="true" style={{ display: 'none' }} />}
     </div>
   )
+}
+
+/** Скільки пікселів полотна на CSS-піксель шару для м’якого світла на телефоні. */
+const SOFT_SCALE = 0.35
+const SOFT_MAX = 1024
+
+/**
+ * Малює SVG світлового шару в маленьке полотно (один раз для заданого розміру) і показує полотно замість SVG.
+ * Вміст шару самодостатній (градієнти визначені всередині), тож його можна відмалювати як зображення.
+ */
+function bakeSoftLayer(svgEl: SVGSVGElement, cv: HTMLCanvasElement, cssW: number, cssH: number, baked: { current: string }) {
+  let s = SOFT_SCALE
+  const longest = Math.max(cssW, cssH) * s
+  if (longest > SOFT_MAX) s *= SOFT_MAX / longest
+  const W = Math.max(2, Math.round(cssW * s))
+  const H = Math.max(2, Math.round(cssH * s))
+  const key = `${W}x${H}|${svgEl.getAttribute('viewBox')}`
+  if (baked.current === key) return
+  baked.current = key
+  const clone = svgEl.cloneNode(true) as SVGSVGElement
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  clone.setAttribute('width', String(W))
+  clone.setAttribute('height', String(H))
+  clone.removeAttribute('style')
+  const img = new Image()
+  img.onload = () => {
+    if (baked.current !== key) return
+    cv.width = W
+    cv.height = H
+    const ctx = cv.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, W, H)
+    ctx.drawImage(img, 0, 0, W, H)
+    cv.style.display = ''
+    svgEl.style.display = 'none'
+  }
+  // якщо щось пішло не так — лишається звичайний SVG
+  img.onerror = () => void (baked.current = '')
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`
 }
 
 /** Доступ до реєстру сцени (для шарів частинок, що позиціонуються у світових координатах). */

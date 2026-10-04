@@ -10,6 +10,8 @@ export const Banner = memo(function Banner({ bus, reduced }: { bus: FrameBus; re
   useEffect(
     () =>
       bus.add((ctx) => {
+        // напис плавно з’являється — досить «важких» кадрів (на телефоні 30 на секунду)
+        if (!ctx.heavy) return
         const node = el.current
         if (!node) return
         let op = 0

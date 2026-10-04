@@ -189,17 +189,19 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
   const update = useCallback(
     (ctx: FrameCtx) => {
       const t = ctx.t
-      const wp = p.W.pose(t)
       if (ctx.heavy) {
+        const wp = p.W.pose(t)
         woman.current?.apply(wp, t)
         man.current?.apply(p.M.pose(t), t)
         herWins.current.forEach((el, i) => setOpacity(el, 0.15 + 0.85 * p.windowsOn(t, i)))
         setDisplay(sill.current, !(wp.propN > 0.5))
       }
-      leaves.current?.update(t, 1, 0.2)
-      motes.current?.update(t, 0.8)
       const tv = p.thread(t)
       thread.current?.opacity(tv)
+      sunny.current?.opacity(p.sunny(t))
+      if (!ctx.heavy) return
+      leaves.current?.update(t, 1, 0.2)
+      motes.current?.update(t, 0.8)
       const sp = p.sparks(t)
       const { ax, ay, bx, by, c1, c2 } = th
       for (let i = 0; i < DOTS; i++) {
@@ -210,7 +212,6 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
         const y = v * v * v * ay + 3 * v * v * u * c1[1] + 3 * v * u * u * c2[1] + u * u * u * by
         dots.current?.set(i, x, y, Math.max(0.25 * tv, sp) * Math.sin(base * Math.PI))
       }
-      sunny.current?.opacity(p.sunny(t))
     },
     [p, th],
   )
@@ -338,7 +339,7 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
       <MoteLayer ref={motes} count={18} area={{ x: -600, y: -1000, w: 1200, h: 900 }} seed={29} color="#ffe2a0" size={2.6} />
 
       {/* нитка світла між вікнами */}
-      <FxLayer ref={thread} bounds={th.box} initialOpacity={0}>
+      <FxLayer ref={thread} bounds={th.box} initialOpacity={0} soft={false}>
         <defs>
           <linearGradient id="wn-thread" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#ffe6b0" />
