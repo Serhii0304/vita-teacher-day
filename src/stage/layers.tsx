@@ -155,6 +155,7 @@ export function SceneRoot({
   update: (ctx: FrameCtx) => void
   children: ReactNode
 }) {
+  const compact = useContext(CompactRendering)
   const root = useRef<HTMLDivElement>(null)
   const pending = useRef<(HTMLElement | SVGElement)[]>([])
   // сцену вже показано — шари більше не ховаємо
@@ -188,7 +189,9 @@ export function SceneRoot({
         pending.current = []
       },
     })
-  }, [id, register, update])
+    // Replacing the renderer also replaces rig refs. Register again to replay
+    // the complete last scene pose immediately, including while paused.
+  }, [id, register, update, compact])
   return (
     <div ref={root} className="scene" data-scene={id} role="img" aria-label={label} style={{ display: 'none' }}>
       <Warmup.Provider value={warmup}>{children}</Warmup.Provider>
