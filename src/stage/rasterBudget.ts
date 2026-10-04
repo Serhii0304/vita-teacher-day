@@ -5,6 +5,12 @@ import type { Screen } from './types'
 export const STATIC_MAX_EDGE = 2048
 export const STATIC_MAX_PIXELS = 2 * 1024 * 1024
 
+/** Total moving surface budget per camera, independent of display pixel density. */
+export function mobileFrameSize(cssW: number, cssH: number) {
+  const scale = Math.min(1.25, 1280 / Math.max(cssW, cssH), Math.sqrt(600_000 / (cssW * cssH)))
+  return { width: Math.max(1, Math.floor(cssW * scale)), height: Math.max(1, Math.floor(cssH * scale)) }
+}
+
 export function bitmapSize(cssW: number, cssH: number) {
   const scale = Math.min(1.75, STATIC_MAX_EDGE / cssW, STATIC_MAX_EDGE / cssH,
     Math.sqrt(STATIC_MAX_PIXELS / (cssW * cssH)))
