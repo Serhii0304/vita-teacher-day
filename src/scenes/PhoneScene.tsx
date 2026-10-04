@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useContext, useMemo, useRef } from 'react'
 import { ArmchairFront } from '../art/furniture'
 import { HER, HerRoom, type HerRoomHandle } from '../art/HerRoom'
 import { HIS, HisRoom, type HisRoomHandle } from '../art/HisRoom'
@@ -12,6 +12,7 @@ import type { Params } from '../engine/moves'
 import { Actor } from '../stage/actor'
 import { CamTrack, cameraViewBox, rc } from '../stage/camera'
 import { CamLayer, SceneRoot, WorldSvg, sceneWindow, screenKey, type CamLayerHandle, type ViewBox } from '../stage/layers'
+import { CompactRendering } from '../stage/renderingProfile'
 import { setOpacity, setSvgAttribute as attr } from '../stage/svgAttributes'
 import type { FrameCtx, Layout, RegisterScene, Screen } from '../stage/types'
 import { useTimeline } from '../stage/useTimeline'
@@ -260,6 +261,8 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
   const threadGlow = useRef<SVGPathElement>(null)
   const dots = useRef<(HTMLDivElement | null)[]>([])
   const mirrorB = layout === 'tall'
+  // на смартфоні іскорок на нитці немає — сама нитка світла лишається
+  const compact = useContext(CompactRendering)
 
   // камери панелей; дзеркало правої панелі (вузький екран) робить CSS, тому кадр тут звичайний
   const viewA = useCallback((t: number, sub: Screen): ViewBox => cameraViewBox(p.camW.at(t), sub), [p])
@@ -401,7 +404,7 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
         <path ref={threadGlow} d="" fill="none" stroke="#ffd98f" strokeWidth={10} strokeLinecap="round" opacity={0.35} />
         <path ref={thread} d="" fill="none" stroke="url(#ph-thread)" strokeWidth={2.4} strokeLinecap="round" opacity={0.85} />
       </svg>
-      {Array.from({ length: 9 }, (_, i) => (
+      {Array.from({ length: compact ? 0 : 9 }, (_, i) => (
         <div key={i} ref={(n) => void (dots.current[i] = n)} className="phone__dot" />
       ))}
     </SceneRoot>

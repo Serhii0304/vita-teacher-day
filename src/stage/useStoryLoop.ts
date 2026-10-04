@@ -5,7 +5,6 @@ import { timelineStore, type Timeline } from '../story/timeline'
 import type { FrameBus } from './frameBus'
 import type { Screen } from './types'
 import { FramePacer } from './framePacer'
-import { perf } from './perfStats'
 
 /**
  * Єдиний цикл кадрів. Під час відтворення працює requestAnimationFrame і читає час з аудіо.
@@ -66,8 +65,6 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
         lightCap = 60
         retryAt = 0
       }
-      perf.lightCap = lightCap
-      perf.heavyCap = heavyCap
     }
     let keysFor: Timeline | null = null
     let keys: number[] = []
@@ -91,9 +88,7 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       const tReal = engine.time()
       const t = reducedRef.current ? snapToKey(keys, tReal) : tReal
       if (force || tReal !== lastTime) {
-        const t0 = performance.now()
         bus.run({ t, tReal, tl, screen: screen.current!, reduced: reducedRef.current, heavy })
-        perf.frame(t0, performance.now(), heavy)
         lastTime = tReal
       }
       force = false

@@ -84,8 +84,9 @@ export function LeafLayer({
   unit?: number
   ref?: Ref<LeafFieldHandle>
 }) {
+  // на смартфоні декоративне листя не показуємо зовсім: десятки рухомих шарів зайві для слабшої графіки
   const compact = useContext(CompactRendering)
-  const visibleCount = compact ? Math.min(count, 8) : count
+  const visibleCount = compact ? 0 : count
   const specs = useMemo<LeafSpec[]>(() => {
     const out: LeafSpec[] = []
     for (let i = 0; i < visibleCount; i++) {
@@ -152,6 +153,7 @@ export function LeafLayer({
       })
     },
   }))
+  if (visibleCount === 0) return null
   return (
     <div ref={div} className="particles" style={{ opacity }} aria-hidden="true">
       {specs.map((s, i) => (
@@ -185,8 +187,9 @@ export function MoteLayer({
   size?: number
   ref?: Ref<MoteLayerHandle>
 }) {
+  // на смартфоні пилинок та іскорок немає (як і листя) — менше рухомих шарів
   const compact = useContext(CompactRendering)
-  const visibleCount = compact ? Math.min(count, 8) : count
+  const visibleCount = compact ? 0 : count
   const specs = useMemo(
     () =>
       Array.from({ length: visibleCount }, (_, i) => {
@@ -260,6 +263,7 @@ export function MoteLayer({
       writeShift()
     },
   }))
+  if (visibleCount === 0) return null
   return (
     <div ref={div} className="particles" aria-hidden="true">
       {specs.map((_, i) => (
@@ -276,6 +280,8 @@ export interface DotLayerHandle {
 
 /** Іскорки, що біжать уздовж нерухомої лінії: кожна — окремий композитний шар. */
 export function DotLayer({ count, box, r, color, ref }: { count: number; box: Box; r: number; color: string; ref?: Ref<DotLayerHandle> }) {
+  const compact = useContext(CompactRendering)
+  const visibleCount = compact ? 0 : count
   const { div, env, onEnv } = useBox(box, false)
   const els = useRef<(HTMLDivElement | null)[]>([])
   const last = useRef<string[]>([])
@@ -306,9 +312,10 @@ export function DotLayer({ count, box, r, color, ref }: { count: number; box: Bo
       }
     },
   }))
+  if (visibleCount === 0) return null
   return (
     <div ref={div} className="particles" aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => (
+      {Array.from({ length: visibleCount }, (_, i) => (
         <div key={i} ref={(n) => void (els.current[i] = n)} className="particle particle--dot" style={{ background: color, opacity: 0 }} />
       ))}
     </div>
