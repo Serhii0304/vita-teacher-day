@@ -22,7 +22,10 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
     let raf = 0
     let force = true
     let lastTime = -1
+    // легкі кадри: камера, частинки, світло (композитор) — до 60 на секунду навіть на телефоні;
+    // важкі: персонажі й зміни SVG — на телефоні 30 на секунду
     const pacer = new FramePacer()
+    const heavyPacer = new FramePacer()
     let keysFor: Timeline | null = null
     let keys: number[] = []
     const frame = (now: number) => {
@@ -30,10 +33,11 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       if (document.visibilityState === 'hidden') return
       const playing = !engine.el.paused || engine.getSnapshot().wantsPlay
       // 120 Hz screens must not double SVG work. User actions still draw at once.
-      if (!pacer.take(now, reducedRef.current ? 12 : compactRef.current ? 30 : 60, force)) {
+      if (!pacer.take(now, reducedRef.current ? 12 : 60, force)) {
         if (playing) schedule()
         return
       }
+      const heavy = heavyPacer.take(now, reducedRef.current ? 12 : compactRef.current ? 30 : 60, force)
       const tl = timelineStore.get()
       if (keysFor !== tl) {
         keys = reducedKeys(tl)
@@ -42,7 +46,7 @@ export function useStoryLoop(engine: AudioPlayer, bus: FrameBus, screen: React.R
       const tReal = engine.time()
       const t = reducedRef.current ? snapToKey(keys, tReal) : tReal
       if (force || tReal !== lastTime) {
-        bus.run({ t, tReal, tl, screen: screen.current!, reduced: reducedRef.current })
+        bus.run({ t, tReal, tl, screen: screen.current!, reduced: reducedRef.current, heavy })
         lastTime = tReal
       }
       force = false

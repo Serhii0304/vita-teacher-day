@@ -81,6 +81,13 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
   const update = useCallback(
     (ctx: FrameCtx) => {
         const t = ctx.t
+        // світло й частинки — щокадру (композитор)
+        sun.current?.opacity(p.glow(t))
+        leaves.current?.update(t * 0.6, 1, 0.6)
+        pageLeaves.current?.update(t, 1, 0.3)
+        motes.current?.update(t, 0.8)
+        // далі — зміни SVG, що потребують перемальовування: лише у «важких» кадрах
+        if (!ctx.heavy) return
         const o = p.cover(t)
         // обкладинка: вільний край рухається від x=BW до x=-BW, з легкою перспективою
         const xe = BW * Math.cos(o * Math.PI)
@@ -101,10 +108,6 @@ export function BookScene({ layout, register }: { layout: Layout; register: Regi
         setOpacity(title.current, a)
         attr(title.current, 'transform', `translate(${(-BW / 2).toFixed(1)} ${(-40 + (1 - a) * 10).toFixed(2)})`)
         setOpacity(veil.current, 0.32 * p.paperVeil(t))
-        sun.current?.opacity(p.glow(t))
-        leaves.current?.update(t * 0.6, 1, 0.6)
-        pageLeaves.current?.update(t, 1, 0.3)
-        motes.current?.update(t, 0.8)
         const ph = t * 1.2
         steam1.current?.setAttribute('d', `M560 -170 c${(-10 + Math.sin(ph) * 6).toFixed(1)} -20 ${(12 + Math.sin(ph + 1) * 6).toFixed(1)} -36 ${(Math.sin(ph * 0.8) * 5).toFixed(1)} -60`)
         steam2.current?.setAttribute('d', `M584 -168 c${(-10 + Math.sin(ph + 2) * 6).toFixed(1)} -20 ${(12 + Math.sin(ph + 3) * 6).toFixed(1)} -36 ${(Math.sin(ph * 0.7 + 1) * 5).toFixed(1)} -60`)

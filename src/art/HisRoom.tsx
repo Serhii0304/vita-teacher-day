@@ -28,7 +28,8 @@ export interface HisRoomState {
 }
 
 export interface HisRoomHandle {
-  update(s: HisRoomState): void
+  /** heavy=false — лише світлові шари (без перемальовування SVG). */
+  update(s: HisRoomState, heavy?: boolean): void
 }
 
 export function HisRoom({ ref }: { ref?: Ref<HisRoomHandle> }) {
@@ -43,16 +44,17 @@ export function HisRoom({ ref }: { ref?: Ref<HisRoomHandle> }) {
   const clouds = useRef<FxHandle>(null)
   const W = HIS.win
   useImperativeHandle(ref, () => ({
-    update(s: HisRoomState) {
+    update(s: HisRoomState, heavy = true) {
+      night.current?.opacity(s.night * 0.82)
+      // хмаринки пливуть за шибкою — зсув окремого шару, без перемальовування
+      clouds.current?.move(s.cloud * 600 - 300, 0)
+      if (!heavy) return
       setOpacity(lamp.current, s.lamp)
       setOpacity(warm.current, s.lamp * 0.9)
       setOpacity(cool.current, 0.34 * (1 - s.lamp * 0.8))
-      night.current?.opacity(s.night * 0.82)
       attr(minH.current, 'transform', `rotate(${((s.clock % 60) * 6).toFixed(1)})`)
       attr(hourH.current, 'transform', `rotate(${((7 * 60 + s.clock) * 0.5).toFixed(1)})`)
       setDisplay(cup.current, s.cup)
-      // хмаринки пливуть за шибкою — зсув окремого шару, без перемальовування
-      clouds.current?.move(s.cloud * 600 - 300, 0)
     },
   }))
   const panes = windowPanes(W.x, W.y, W.w, W.h)

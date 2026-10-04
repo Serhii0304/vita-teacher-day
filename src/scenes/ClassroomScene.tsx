@@ -118,12 +118,14 @@ export function ClassroomScene({ layout, register }: { layout: Layout; register:
     (ctx: FrameCtx) => {
       const t = ctx.t
       const pose = p.W.pose(t)
-      woman.current?.apply(pose, t)
+      if (ctx.heavy) {
+        woman.current?.apply(pose, t)
+        const glow = p.chalk(t)
+        setOpacity(boardGlow.current, glow)
+        setOpacity(chalk.current, 0.82 + glow * 0.18)
+      }
       leavesOut.current?.update(t, 1, 0.3)
       motes.current?.update(t, 0.9)
-      const glow = p.chalk(t)
-      setOpacity(boardGlow.current, glow)
-      setOpacity(chalk.current, 0.82 + glow * 0.18)
       // світло з коридору — окремий шар, змінюється лише прозорість
       door.current?.opacity(0.25 + 0.75 * p.doorLight(t))
       // золоті іскорки над книгою слідують за героїнею

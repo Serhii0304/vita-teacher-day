@@ -178,6 +178,8 @@ function plan(tl: Timeline, layout: Layout) {
 }
 
 const SUN_Y0 = -560
+/** Наскільки сонце опускається за весь епізод (див. sunY у плані) — запас для обрізання шарів. */
+const SUN_TRAVEL = 400
 
 export function GardenScene({ layout, register }: { layout: Layout; register: RegisterScene }) {
   const tl = useTimeline()
@@ -206,8 +208,10 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
   const update = useCallback(
     (ctx: FrameCtx) => {
       const t = ctx.t
-      woman.current?.apply(p.W.pose(t), t)
-      man.current?.apply(p.M.pose(t), t)
+      if (ctx.heavy) {
+        woman.current?.apply(p.W.pose(t), t)
+        man.current?.apply(p.M.pose(t), t)
+      }
       const calm = p.calm(t)
       leaves.current?.update(t * (0.4 + 0.6 * calm), Math.max(0.35, calm), 0.6)
       leavesFront.current?.update(t * 0.7, calm, 0.6)
@@ -229,6 +233,7 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
       sparkle.current?.update(t, gl * gl)
       flowerGlow.current?.opacity(0.25 + 0.75 * gl)
       lampGlow.current?.opacity(p.lamps(t))
+      if (!ctx.heavy) return
       const [wOn, mOn] = p.cupsOnTable(t)
       setDisplay(cupW.current, wOn)
       setDisplay(cupM.current, mOn)
@@ -276,7 +281,7 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
         <rect x={-5000} y={-4000} width={10000} height={4000} fill="url(#gd-sunset)" />
       </FxLayer>
       {/* сонце, що повільно сідає за пагорби */}
-      <FxLayer ref={sun} bounds={{ x: sunX - 1500, y: SUN_Y0 - 900, w: 3000, h: 1800 }}>
+      <FxLayer ref={sun} bounds={{ x: sunX - 1500, y: SUN_Y0 - 900, w: 3000, h: 1800 }} travel={SUN_TRAVEL}>
         <defs>
           <radialGradient id="gd-sun">
             <stop offset="0" stopColor="#fff3d4" stopOpacity="1" />
@@ -295,7 +300,7 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
           <circle cx={0} cy={0} r={58} fill="#fff6e2" opacity={0.96} />
         </g>
       </FxLayer>
-      <FxLayer ref={rays} bounds={{ x: sunX - 2200, y: SUN_Y0 - 2200, w: 4400, h: 4400 }} pivot={[sunX, SUN_Y0]} initialOpacity={0.4}>
+      <FxLayer ref={rays} bounds={{ x: sunX - 2200, y: SUN_Y0 - 2200, w: 4400, h: 4400 }} pivot={[sunX, SUN_Y0]} travel={SUN_TRAVEL} initialOpacity={0.4}>
         <defs>
           <radialGradient id="gd-ray" cx="0" cy="0" r="2200" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#fff1cf" stopOpacity="0.32" />
@@ -426,7 +431,7 @@ export function GardenScene({ layout, register }: { layout: Layout; register: Re
       </WorldSvg>
       <LeafLayer ref={leavesFront} count={6} area={{ x: -2400, y: -900, w: 3900, h: 1300 }} seed={64} scale={2.4} speed={0.55} />
       {/* тепле світло, що огортає героїв (після персонажів — «загортання» світлом) */}
-      <FxLayer ref={wrap} bounds={{ x: sunX - 1500, y: SUN_Y0 - 1500, w: 3000, h: 3000 }} initialOpacity={0}>
+      <FxLayer ref={wrap} bounds={{ x: sunX - 1500, y: SUN_Y0 - 1500, w: 3000, h: 3000 }} travel={SUN_TRAVEL} initialOpacity={0}>
         <defs>
           <radialGradient id="gd-wrap" cx="0" cy="0" r="1500" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#ffd79a" stopOpacity="0.5" />

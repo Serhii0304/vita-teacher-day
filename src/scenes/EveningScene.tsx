@@ -127,8 +127,8 @@ export function EveningScene({ layout, register }: { layout: Layout; register: R
     (ctx: FrameCtx) => {
       const t = ctx.t
       const lamp = p.lamp(t)
-      room.current?.update({ lamp, night: 0.15 + lamp * 0.1, clock: 0, cup: p.cup(t), notebooks: p.notebooks(t), cards: p.cards(t), vase: false })
-      woman.current?.apply(p.W.pose(t), t)
+      room.current?.update({ lamp, night: 0.15 + lamp * 0.1, clock: 0, cup: p.cup(t), notebooks: p.notebooks(t), cards: p.cards(t), vase: false }, ctx.heavy)
+      if (ctx.heavy) woman.current?.apply(p.W.pose(t), t)
       motes.current?.update(t, lamp)
       armFront.current?.opacity(p.armFront(t))
       cool.current?.opacity(0.16 * (1 - lamp))

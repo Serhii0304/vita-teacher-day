@@ -1,4 +1,4 @@
-import { useId, useImperativeHandle, useRef, type ReactNode, type Ref, type RefCallback } from 'react'
+import { useContext, useId, useImperativeHandle, useRef, type ReactNode, type Ref, type RefCallback } from 'react'
 import { solveIK } from '../engine/ik'
 import { clamp, hash, lerp, noise1 } from '../engine/math'
 import type { Params } from '../engine/moves'
@@ -18,6 +18,7 @@ import {
 import type { Outfit, SkinHair } from './palettes'
 import { BookProp, BouquetProp, CupProp, NotebooksProp, PhoneProp } from './props'
 import { armChain } from './rigMath'
+import { CompactRendering } from '../stage/renderingProfile'
 
 export interface CharacterHandle {
   apply(p: Params, t: number): void
@@ -50,6 +51,10 @@ function blinkAt(t: number, seed: number): number {
 
 export function Character({ body, look, outfit, light = 'front', seed = 1, shadow = 0.32, ref }: Props) {
   const uid = 'c' + useId().replace(/[^a-zA-Z0-9_-]/g, '')
+  // на телефоні дрібні «живі» рухи оновлюються рідше (див. apply)
+  const compact = useContext(CompactRendering)
+  const micro = useRef(compact)
+  micro.current = compact
   const els = useRef<Record<string, SVGElement>>({})
   const attributes = useRef(new WeakMap<SVGElement, Map<string, string>>())
   const cbs = useRef(new Map<string, RefCallback<SVGElement>>())
@@ -100,11 +105,14 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
       const flip = p.flip >= 0 ? 1 : -1
       set('root', 'transform', `translate(${r(p.x)} ${r(p.y)}) scale(${r(p.sc * flip * 1000) / 1000} ${r(p.sc * 1000) / 1000})`)
 
-      // «живі» рухи — функції від часу, тому на паузі завмирають
-      const breath = Math.sin((t * Math.PI * 2) / 4.1 + seed) * p.breath
+      // «живі» рухи — функції від часу, тому на паузі завмирають.
+      // На телефоні дихання, похитування, волосся й погляд крокують 10 разів на секунду:
+      // між кроками персонаж не змінюється, тож браузер не перемальовує його щокадру.
+      const tm = micro.current ? Math.floor(t * 10) / 10 : t
+      const breath = Math.sin((tm * Math.PI * 2) / 4.1 + seed) * p.breath
       const idle = p.idle
-      const leanIdle = noise1(t * 0.23, seed + 2) * 0.7 * idle
-      const headIdle = noise1(t * 0.41, seed + 4) * 1.4 * idle
+      const leanIdle = noise1(tm * 0.23, seed + 2) * 0.7 * idle
+      const headIdle = noise1(tm * 0.41, seed + 4) * 1.4 * idle
       const nodOsc = p.nod * 5.5 * Math.max(0, Math.sin((t * Math.PI * 2) / 0.95))
 
       const P = { x: p.px, y: body.pelvisY + p.py }
@@ -146,7 +154,7 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
         'transform',
         `${tc} translate(${hp[0]} ${r(hp[1] - breath * 0.5)}) rotate(${r(headRot)}) scale(${body.headScale})`,
       )
-      const sway = Math.sin(t * 1.9 + seed) * 1.6 * p.wind + Math.sin(t * 0.7 + seed) * 0.6
+      const sway = Math.sin(tm * 1.9 + seed) * 1.6 * p.wind + Math.sin(tm * 0.7 + seed) * 0.6
       set('backHairSway', 'transform', `rotate(${r(-headRot * 0.18 + sway)} 0 -36)`)
       set('frontLockSway', 'transform', `rotate(${r(-headRot * 0.22 + sway * 1.3)} -14 -18)`)
 
@@ -160,7 +168,7 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
         browIn: p.browIn,
         eye: p.eye * (1 - blink * 0.96),
         squint: p.squint,
-        lookX: p.lookX + noise1(t * 0.9, seed + 9) * 0.07,
+        lookX: p.lookX + noise1(tm * 0.9, seed + 9) * 0.07,
         lookY: p.lookY,
       }
       const talkO = p.talk * (0.1 + 0.3 * Math.max(0, Math.sin(t * 12.7 + Math.sin(t * 3.3 + seed) * 1.9)))
@@ -265,7 +273,7 @@ export function Character({ body, look, outfit, light = 'front', seed = 1, shado
           const steam = r(clamp(p.steam))
           style(`${s}steam`, 'opacity', String(steam))
           if (steam <= 0) continue
-          const ph = t * 1.3 + seed
+          const ph = tm * 1.3 + seed
           set(`${s}steam1`, 'd', `M4 -18 c${r(-3 + Math.sin(ph) * 1.5)} -4 ${r(3 + Math.sin(ph + 1) * 1.5)} -7 ${r(Math.sin(ph * 0.8) * 1.2)} -11`)
           set(`${s}steam2`, 'd', `M9 -18 c${r(-3 + Math.sin(ph + 2) * 1.5)} -4 ${r(3 + Math.sin(ph + 3) * 1.5)} -7 ${r(Math.sin(ph * 0.7 + 1) * 1.2)} -11`)
         }

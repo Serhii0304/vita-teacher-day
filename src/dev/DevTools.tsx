@@ -46,9 +46,10 @@ export default function DevTools({ bus, engine, onStart }: { bus: FrameBus; engi
           tl: timelineStore.get(),
           screen: { w, h, layout: w / h >= 1 ? ('wide' as const) : ('tall' as const), reservedBottom: h * 0.24, reservedTop: 24 },
           reduced: false,
+          heavy: true,
         }
         const t0 = performance.now()
-        for (let i = 0; i < n; i++) bus.run({ ...last, t: t + i / 60, tReal: t + i / 60 })
+        for (let i = 0; i < n; i++) bus.run({ ...last, t: t + i / 60, tReal: t + i / 60, heavy: true })
         return +((performance.now() - t0) / n).toFixed(2)
       },
     }

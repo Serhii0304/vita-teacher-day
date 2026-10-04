@@ -123,8 +123,10 @@ export function Chorus1Scene({ layout, register }: { layout: Layout; register: R
     (ctx: FrameCtx) => {
       const t = ctx.t
       const wp = p.W.pose(t)
-      woman.current?.apply(wp, t)
-      man.current?.apply(p.M.pose(t), t)
+      if (ctx.heavy) {
+        woman.current?.apply(wp, t)
+        man.current?.apply(p.M.pose(t), t)
+      }
       leaves.current?.update(t, 1, 0.4)
       leavesFront.current?.update(t * 0.8, 1, 0.5)
       // сонце, промені, сяйво й спалах — окремі шари: лише прозорість і поворот (композитор)

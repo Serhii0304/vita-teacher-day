@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { FramePacer } from '../src/stage/framePacer.ts'
 import { sceneMounts } from '../src/stage/sceneMounts.ts'
 import { setSvgAttribute } from '../src/stage/svgAttributes.ts'
-import { cameraTransform, computeEnvelope } from '../src/stage/envelope.ts'
+import { cameraTransform, computeEnvelope, cropToEnvelope } from '../src/stage/envelope.ts'
 import { armChain, gripWorld, targetForGrip } from '../src/characters/rigMath.ts'
 import { MAN, WOMAN } from '../src/characters/body.ts'
 import { restPose } from '../src/characters/pose.ts'
@@ -136,4 +136,19 @@ test('arms: a hand-over grip still lands exactly where the scene expects it', ()
       assert.ok(Math.hypot(gx - wx, gy - wy) < 0.6, `${body.kind}: grip ${gx.toFixed(1)},${gy.toFixed(1)} != ${wx},${wy}`)
     }
   }
+})
+
+test('light layers are cropped to what the camera can ever see, with room for motion', () => {
+  const env = { x: -500, y: -800, w: 900, h: 1100 }
+  // нерухоме тонування неба обрізається до конверта камери
+  assert.deepEqual(cropToEnvelope({ x: -5000, y: -4000, w: 10000, h: 4000 }, env), { x: -500, y: -800, w: 900, h: 800 })
+  // сонце, що опускається на 370 од., лишається покритим при будь-якому зсуві
+  const sun = cropToEnvelope({ x: -1000, y: -1500, w: 3000, h: 1800 }, env, 400)
+  for (let dy = 0; dy <= 370; dy += 37) assert.ok(sun.y + dy <= env.y && sun.y + sun.h + dy >= Math.min(300, env.y + env.h), `dy=${dy}`)
+  // промені обертаються навколо сонця: квадрат обрізання покриває конверт за будь-якого кута
+  const pivot = [860, -560]
+  const rays = cropToEnvelope({ x: pivot[0] - 2200, y: pivot[1] - 2200, w: 4400, h: 4400 }, env, 0, pivot)
+  const R = Math.min(rays.w, rays.h) / 2
+  for (const [x, y] of [[env.x, env.y], [env.x + env.w, env.y], [env.x, env.y + env.h], [env.x + env.w, env.y + env.h]]) assert.ok(Math.hypot(x - pivot[0], y - pivot[1]) <= R + 1e-6)
+  assert.ok(rays.w < 4400, 'rays layer got smaller')
 })

@@ -29,31 +29,36 @@ export const StoryStage = memo(function StoryStage({ scenes, bus, layout }: { sc
   }, [mounted])
 
   const prepared = useRef(new WeakSet<SceneRuntime>())
+  const shown = useRef(new WeakSet<SceneRuntime>())
   const draw = (rt: SceneRuntime, vis: number, ctx: FrameCtx) => {
     if (!rt.el) return
     if (vis <= 0.001) {
       // сцена ще не з’явилась (або вже зникла): стоїть у розкладці невидимою; спершу один раз
-      // розставляємо її на поточний час, далі щокадру вмикаємо по одному важкому шару
+      // розставляємо її на поточний час, далі на кожному важкому кадрі вмикаємо по одному шару
       if (rt.el.style.opacity !== '0') rt.el.style.opacity = '0'
       if (!prepared.current.has(rt)) {
         prepared.current.add(rt)
         if (rt.el.style.display !== '') rt.el.style.display = ''
-        rt.update(ctx)
-      } else rt.warm?.()
+        rt.update({ ...ctx, heavy: true })
+      } else if (ctx.heavy) rt.warm?.()
       return
     }
     rt.reveal?.()
     if (rt.el.style.display !== '') rt.el.style.display = ''
     const opacity = vis >= 0.999 ? '1' : vis.toFixed(3)
     if (rt.el.style.opacity !== opacity) rt.el.style.opacity = opacity
-    rt.update(ctx)
+    // перший видимий кадр сцени завжди повний
+    if (!shown.current.has(rt)) {
+      shown.current.add(rt)
+      rt.update({ ...ctx, heavy: true })
+    } else rt.update(ctx)
   }
   const register: RegisterScene = useCallback((id, rt) => {
     runtimes.current.set(id, rt)
     // A seek on pause has no running RAF to initialize a newly mounted scene.
     if (bus.last) {
       const schedule = sceneSchedule(bus.last.tl)
-      draw(rt, sceneVisibility(schedule, schedule.findIndex(scene => scene.id === id), bus.last.tReal), bus.last)
+      draw(rt, sceneVisibility(schedule, schedule.findIndex(scene => scene.id === id), bus.last.tReal), { ...bus.last, heavy: true })
     }
     return () => {
       if (runtimes.current.get(id) === rt) runtimes.current.delete(id)

@@ -817,6 +817,18 @@
   pointer-events: none;
   will-change: transform, opacity;
 }
+.phone__dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6.4px;
+  height: 6.4px;
+  border-radius: 50%;
+  background: #fff4d6;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
 .phone__overlay {
   position: absolute;
   left: 0;
@@ -825,5 +837,5 @@
   height: 100%;
   overflow: visible;
   pointer-events: none;
-  will-change: transform;
+  will-change: transform, opacity;
 }

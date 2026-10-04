@@ -258,7 +258,7 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
   const overlay = useRef<SVGSVGElement>(null)
   const thread = useRef<SVGPathElement>(null)
   const threadGlow = useRef<SVGPathElement>(null)
-  const dots = useRef<(SVGCircleElement | null)[]>([])
+  const dots = useRef<(HTMLDivElement | null)[]>([])
   const mirrorB = layout === 'tall'
 
   // камери панелей; дзеркало правої панелі (вузький екран) робить CSS, тому кадр тут звичайний
@@ -293,12 +293,15 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
       const vbB = viewB(t, subB)
 
       const kin = p.kin(t)
-      herRoom.current?.update({ lamp: 1, night: p.night(t), clock: p.clock(t), cup: true, notebooks: true, cards: 0.3 + kin * 0.5, vase: true, bloom: 1 })
-      hisRoom.current?.update({ lamp: 1, night: p.night(t), clock: p.clock(t), cup: true, cloud: p.cloud(t) })
+      herRoom.current?.update({ lamp: 1, night: p.night(t), clock: p.clock(t), cup: true, notebooks: true, cards: 0.3 + kin * 0.5, vase: true, bloom: 1 }, ctx.heavy)
+      hisRoom.current?.update({ lamp: 1, night: p.night(t), clock: p.clock(t), cup: true, cloud: p.cloud(t) }, ctx.heavy)
+      // пози потрібні й для нитки між телефонами; самих персонажів перемальовуємо лише у важких кадрах
       const wp = p.W.pose(t)
       const mp = p.M.pose(t)
-      woman.current?.apply(wp, t)
-      man.current?.apply(mp, t)
+      if (ctx.heavy) {
+        woman.current?.apply(wp, t)
+        man.current?.apply(mp, t)
+      }
       setOpacity(kinA.current, kin * 0.22)
       setOpacity(kinB.current, kin * 0.22)
 
@@ -318,23 +321,25 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
       setStyle(dividerGlow.current, 'transform', `translate3d(${(cx - RX).toFixed(1)}px, ${(cy - RY).toFixed(1)}px, 0) scale(${(rx / RX).toFixed(3)}, ${(ry / RY).toFixed(3)})`)
       setOpacity(dividerGlow.current, (0.35 + kin * 0.45).toFixed(2))
 
-      // нитка світла між телефонами (екранні координати)
+      // нитка світла між телефонами (екранні координати, округлені до пікселя: шлях перемальовується,
+      // лише коли кінці справді зрушили, а прозорість — у шарі накладки, без перемальовування)
       const wa = phonePoint(wp, WOMAN)
       const wb = phonePoint(mp, MAN)
-      const a: [number, number] = [A.x + ((wa[0] - vbA[0]) / vbA[2]) * A.w, A.y + ((wa[1] - vbA[1]) / vbA[3]) * A.h]
+      const a: [number, number] = [Math.round(A.x + ((wa[0] - vbA[0]) / vbA[2]) * A.w), Math.round(A.y + ((wa[1] - vbA[1]) / vbA[3]) * A.h)]
       const bx = ((wb[0] - vbB[0]) / vbB[2]) * B.w
-      const b: [number, number] = [B.x + (mirrorB ? B.w - bx : bx), B.y + ((wb[1] - vbB[1]) / vbB[3]) * B.h]
-      const lift = wide ? Math.min(scr.h * 0.3, 240) : 0
-      const side = wide ? 0 : -Math.min(scr.w * 0.35, 150)
+      const b: [number, number] = [Math.round(B.x + (mirrorB ? B.w - bx : bx)), Math.round(B.y + ((wb[1] - vbB[1]) / vbB[3]) * B.h)]
+      const lift = wide ? Math.round(Math.min(scr.h * 0.3, 240)) : 0
+      const side = wide ? 0 : -Math.round(Math.min(scr.w * 0.35, 150))
       const c1: [number, number] = [a[0] + side, a[1] - lift]
       const c2: [number, number] = [b[0] + side, b[1] - lift]
-      const d = `M${a[0].toFixed(1)} ${a[1].toFixed(1)}C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`
       const thr = open * (0.55 + 0.45 * kin)
-      attr(thread.current, 'd', d)
-      attr(threadGlow.current, 'd', d)
-      setOpacity(thread.current, thr * 0.85)
-      setOpacity(threadGlow.current, thr * 0.35)
-      // іскорки біжать від того, хто говорить, до того, хто слухає
+      if (ctx.heavy) {
+        const d = `M${a[0]} ${a[1]}C${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${b[0]} ${b[1]}`
+        attr(thread.current, 'd', d)
+        attr(threadGlow.current, 'd', d)
+      }
+      setOpacity(overlay.current, thr.toFixed(2))
+      // іскорки — окремі легкі шари, що біжать від того, хто говорить, до того, хто слухає
       const dir = p.speaker(ctx.tReal)
       dots.current.forEach((el, i) => {
         if (!el) return
@@ -342,8 +347,7 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
         const base = (i / n + t * 0.16) % 1
         const u = dir >= 0 ? base : 1 - base
         const pt = bez(a, c1, c2, b, u)
-        attr(el, 'cx', pt[0].toFixed(1))
-        attr(el, 'cy', pt[1].toFixed(1))
+        setStyle(el, 'transform', `translate3d(${(pt[0] - 3.2).toFixed(1)}px, ${(pt[1] - 3.2).toFixed(1)}px, 0)`)
         const fade = Math.sin(base * Math.PI)
         setOpacity(el, (thr * fade * (dir === 0 ? 0.35 : 0.9)).toFixed(2))
       })
@@ -386,7 +390,7 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
       </div>
       <div ref={dividerGlow} className="phone__glow" />
       <div ref={divider} className="phone__divider" />
-      <svg ref={overlay} className="phone__overlay" aria-hidden="true" focusable="false">
+      <svg ref={overlay} className="phone__overlay" aria-hidden="true" focusable="false" style={{ opacity: 0 }}>
         <defs>
           <linearGradient id="ph-thread" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#ffe6b0" />
@@ -394,12 +398,12 @@ export function PhoneScene({ layout, register }: { layout: Layout; register: Reg
             <stop offset="1" stopColor="#ffe6b0" />
           </linearGradient>
         </defs>
-        <path ref={threadGlow} d="" fill="none" stroke="#ffd98f" strokeWidth={10} strokeLinecap="round" />
-        <path ref={thread} d="" fill="none" stroke="url(#ph-thread)" strokeWidth={2.4} strokeLinecap="round" />
-        {Array.from({ length: 9 }, (_, i) => (
-          <circle key={i} ref={(n) => void (dots.current[i] = n)} r={3.2} fill="#fff4d6" />
-        ))}
+        <path ref={threadGlow} d="" fill="none" stroke="#ffd98f" strokeWidth={10} strokeLinecap="round" opacity={0.35} />
+        <path ref={thread} d="" fill="none" stroke="url(#ph-thread)" strokeWidth={2.4} strokeLinecap="round" opacity={0.85} />
       </svg>
+      {Array.from({ length: 9 }, (_, i) => (
+        <div key={i} ref={(n) => void (dots.current[i] = n)} className="phone__dot" />
+      ))}
     </SceneRoot>
   )
 }

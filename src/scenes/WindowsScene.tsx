@@ -190,9 +190,12 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
     (ctx: FrameCtx) => {
       const t = ctx.t
       const wp = p.W.pose(t)
-      const mp = p.M.pose(t)
-      woman.current?.apply(wp, t)
-      man.current?.apply(mp, t)
+      if (ctx.heavy) {
+        woman.current?.apply(wp, t)
+        man.current?.apply(p.M.pose(t), t)
+        herWins.current.forEach((el, i) => setOpacity(el, 0.15 + 0.85 * p.windowsOn(t, i)))
+        setDisplay(sill.current, !(wp.propN > 0.5))
+      }
       leaves.current?.update(t, 1, 0.2)
       motes.current?.update(t, 0.8)
       const tv = p.thread(t)
@@ -208,8 +211,6 @@ export function WindowsScene({ layout, register }: { layout: Layout; register: R
         dots.current?.set(i, x, y, Math.max(0.25 * tv, sp) * Math.sin(base * Math.PI))
       }
       sunny.current?.opacity(p.sunny(t))
-      herWins.current.forEach((el, i) => setOpacity(el, 0.15 + 0.85 * p.windowsOn(t, i)))
-      setDisplay(sill.current, !(wp.propN > 0.5))
     },
     [p, th],
   )

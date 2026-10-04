@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useImperativeHandle, useLayoutEffect, useMemo, useRef, type ReactNode, type Ref } from 'react'
 import { sceneSchedule } from '../story/SceneTimeline'
 import { CompactRendering } from './renderingProfile'
-import { cameraTransform, computeEnvelope, rasterQuality, type SceneEnvelope, type ViewFn } from './envelope'
+import { cameraTransform, computeEnvelope, cropToEnvelope, rasterQuality, type SceneEnvelope, type ViewFn } from './envelope'
 import type { FrameCtx, RegisterScene, SceneId, Screen } from './types'
 
 /**
@@ -273,6 +273,7 @@ export interface FxHandle {
 export function FxLayer({
   bounds,
   pivot,
+  travel = 0,
   initialOpacity = 1,
   fill,
   clip = false,
@@ -281,6 +282,8 @@ export function FxLayer({
 }: {
   bounds: { x: number; y: number; w: number; h: number }
   pivot?: [number, number]
+  /** Наскільки (у світових одиницях) шар зсувається через move() — щоб обрізання не відкрило край. */
+  travel?: number
   initialOpacity?: number
   /** Однотонна накладка (тонування сцени): шар без SVG, лише колір фону. */
   fill?: string
@@ -333,19 +336,22 @@ export function FxLayer({
         if (!d) return
         const k = e.k
         state.current.k = k
-        d.style.left = `${((bounds.x - e.x) * k).toFixed(2)}px`
-        d.style.top = `${((bounds.y - e.y) * k).toFixed(2)}px`
-        d.style.width = `${(bounds.w * k).toFixed(2)}px`
-        d.style.height = `${(bounds.h * k).toFixed(2)}px`
-        const px = pivot ? (pivot[0] - bounds.x) * k : 0
-        const py = pivot ? (pivot[1] - bounds.y) * k : 0
+        // шар не більший, ніж будь-коли побачить камера: менше пам’яті відеокарти й растеризації
+        const c = clip ? bounds : cropToEnvelope(bounds, e, travel, pivot)
+        d.style.left = `${((c.x - e.x) * k).toFixed(2)}px`
+        d.style.top = `${((c.y - e.y) * k).toFixed(2)}px`
+        d.style.width = `${(c.w * k).toFixed(2)}px`
+        d.style.height = `${(c.h * k).toFixed(2)}px`
+        svg.current?.setAttribute('viewBox', `${c.x.toFixed(2)} ${c.y.toFixed(2)} ${c.w.toFixed(2)} ${c.h.toFixed(2)}`)
+        const px = pivot ? (pivot[0] - c.x) * k : 0
+        const py = pivot ? (pivot[1] - c.y) * k : 0
         const target = clip ? svg.current : d
         if (target) target.style.transformOrigin = `${px.toFixed(2)}px ${py.toFixed(2)}px`
         state.current.lastT = ''
         write()
       },
     })
-  }, [reg, bounds.x, bounds.y, bounds.w, bounds.h, pivot?.[0], pivot?.[1], clip])
+  }, [reg, bounds.x, bounds.y, bounds.w, bounds.h, pivot?.[0], pivot?.[1], clip, travel])
   const hidden = initialOpacity <= 0.002
   return (
     <div

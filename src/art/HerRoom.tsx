@@ -23,7 +23,8 @@ export interface HerRoomState {
 }
 
 export interface HerRoomHandle {
-  update(s: HerRoomState): void
+  /** heavy=false — лише світлові шари (без перемальовування SVG). */
+  update(s: HerRoomState, heavy?: boolean): void
 }
 
 export const HER = {
@@ -52,12 +53,13 @@ export function HerRoom({ id, ref }: { id: string; ref?: Ref<HerRoomHandle> }) {
   const vase = useRef<SVGGElement>(null)
   const vaseBloom = useRef<SVGGElement>(null)
   useImperativeHandle(ref, () => ({
-    update(s: HerRoomState) {
+    update(s: HerRoomState, heavy = true) {
       lamp.current?.opacity(s.lamp)
-      attr(lampShade.current, 'fill', s.lamp > 0.5 ? '#ffe7b8' : '#e9d4ac')
       warm.current?.opacity(s.lamp * 0.9)
       cool.current?.opacity(0.26 * (1 - s.lamp * 0.8))
       night.current?.opacity(s.night * 0.82)
+      if (!heavy) return
+      attr(lampShade.current, 'fill', s.lamp > 0.5 ? '#ffe7b8' : '#e9d4ac')
       attr(moon.current, 'transform', `translate(0 ${(-s.night * 40).toFixed(1)})`)
       const m = s.clock
       attr(minH.current, 'transform', `rotate(${((m % 60) * 6).toFixed(1)})`)

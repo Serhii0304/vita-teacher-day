@@ -19,6 +19,12 @@ export interface FrameCtx {
   tl: Timeline
   screen: Screen
   reduced: boolean
+  /**
+   * Чи оновлювати в цьому кадрі «дорогі» SVG-елементи (персонажі, атрибути ілюстрації).
+   * Легкі кадри рухають лише камеру, частинки й світлові шари (робота композитора),
+   * тому на телефоні вони йдуть частіше за важкі.
+   */
+  heavy: boolean
 }
 
 export interface Rect {

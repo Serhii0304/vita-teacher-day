@@ -64,3 +64,31 @@ export function rasterQuality(compact: boolean): number {
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
   return compact ? Math.min(1, 1.75 / dpr) : 1
 }
+
+type Box = { x: number; y: number; w: number; h: number }
+
+/**
+ * Межі світлового шару, обрізані до «конверта» камери (з запасом на зсув).
+ * Для шару, що обертається навколо pivot, — квадрат, який при будь-якому куті покриває конверт.
+ */
+export function cropToEnvelope(b: Box, e: Box, travel = 0, pivot?: [number, number]): Box {
+  let r: Box
+  if (pivot) {
+    let R = 0
+    for (const [x, y] of [
+      [e.x, e.y],
+      [e.x + e.w, e.y],
+      [e.x, e.y + e.h],
+      [e.x + e.w, e.y + e.h],
+    ])
+      R = Math.max(R, Math.hypot(x - pivot[0], y - pivot[1]))
+    R += travel
+    r = { x: pivot[0] - R, y: pivot[1] - R, w: 2 * R, h: 2 * R }
+  } else r = { x: e.x - travel, y: e.y - travel, w: e.w + 2 * travel, h: e.h + 2 * travel }
+  const x0 = Math.max(b.x, r.x)
+  const y0 = Math.max(b.y, r.y)
+  const x1 = Math.min(b.x + b.w, r.x + r.w)
+  const y1 = Math.min(b.y + b.h, r.y + r.h)
+  if (x1 - x0 < 1 || y1 - y0 < 1) return { x: b.x, y: b.y, w: 1, h: 1 }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
